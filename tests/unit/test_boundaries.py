@@ -86,7 +86,15 @@ class BoundaryInventoryTests(unittest.TestCase):
             self.scan()
 
     def test_runtime_model_groups_remain_separate(self):
+        # Version-like substrings in temporary paths must not change the binding.
+        self.root = self.root / 'v1-workspace'
+        self.root.mkdir()
+        self.path = self.root / 'native.jsonl'
+        self.rows[1]['payload']['cwd'] = str(self.root)
         self.write()
         copy = self.root / 'second.jsonl'
-        copy.write_text(self.path.read_text().replace('"s"', '"s2"').replace('v1', 'v2'))
+        rows = [json.loads(line) for line in self.path.read_text().splitlines()]
+        rows[0]['payload'].update(id='s2', cli_version='v2')
+        rows[2]['payload']['thread_id'] = 's2'
+        copy.write_text(''.join(json.dumps(row) + '\n' for row in rows))
         self.assertEqual(len(inventory([self.path, copy], workspace=self.root)['groups']), 2)
