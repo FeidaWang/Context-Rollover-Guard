@@ -1,0 +1,6 @@
+{
+  "artifact": "crg.pyz",
+  "sha256": "9a2c0db352e6ca3997f214bd5e63d404dec686954182f056bdc54e68e15b97be",
+  "python": ">=3.11; inspected machine uses python3.13",
+  "schemas": "external version-bound evidence; pass --schema to recovery"
+}

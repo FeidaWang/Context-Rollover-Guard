@@ -1,0 +1,27 @@
+[context_rollover]
+enabled = true
+mode = "MODE_B"
+codex_binary = "/Applications/ChatGPT.app/Contents/Resources/codex"
+archive_root = ".codex/context-archive"
+state_root = ".crg-state"
+
+[predictor]
+window_size = 8
+min_growth_tokens = 8000
+safety_buffer_tokens = 8000
+safety_buffer_percent = 0.03
+warn_probability = 0.75
+hard_arm_remaining_tokens = 12000
+derived_limit_percent = 0.90
+conservative_limit_percent = 0.80
+
+[rollover]
+archive_old_thread = true
+preserve_model = true
+preserve_cwd = true
+preserve_permissions = true
+forward_original_prompt = true
+
+[emergency]
+block_auto_compact = true
+force_rollover_on_next_prompt = true

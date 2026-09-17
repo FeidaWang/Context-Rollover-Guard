@@ -1,0 +1,9 @@
+{
+  "SKILL.md": "6c23a43b25108b5fdb7ddaafaf31615b1de23cf7f5f762ee08170b8cddf81f2c",
+  "agents/openai.yaml": "bed3627877ea2c203593384ac9bd98ad15b5439228d22dfa40c5d65e919fc3c4",
+  "references/desktop.md": "abc7cc719da937a447896a3968b506e06c9c32c15645837cfbf4cbacb2c3b2ab",
+  "references/observe-sequence.jsonl": "026d8c769ae3ffa72e38b8551e722be125163e4545609b6df9455dda33d6f0fe",
+  "references/recovery.md": "829ca1cb3c85af44e8c3860f5a8fc4ef2cccae371fe5a3af0c8a0402bc2f93f3",
+  "scripts/crg.pyz": "9a2c0db352e6ca3997f214bd5e63d404dec686954182f056bdc54e68e15b97be",
+  "scripts/self_test.py": "f41bb9b1e996da8bb043dc6cbba43614e4634d79a790d589925b84fabe04661f"
+}

@@ -1,0 +1,30 @@
+{
+  "name": "context-rollover-guard",
+  "version": "0.1.0",
+  "description": "Safely inspect context pressure and resume verified Codex handoffs.",
+  "author": {
+    "name": "FeidaWang",
+    "url": "https://github.com/FeidaWang"
+  },
+  "homepage": "https://github.com/FeidaWang/Context-Rollover-Guard",
+  "repository": "https://github.com/FeidaWang/Context-Rollover-Guard",
+  "license": "Apache-2.0",
+  "keywords": ["codex", "context", "rollover", "handoff", "recovery"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Context Rollover Guard",
+    "shortDescription": "Inspect context pressure and resume verified handoffs.",
+    "longDescription": "A conservative, capability-gated Codex skill for inspecting project handoff state and resuming work from a verified context rollover. It preserves original tasks and never blindly retries ambiguous prompts.",
+    "developerName": "FeidaWang",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://github.com/FeidaWang/Context-Rollover-Guard",
+    "defaultPrompt": [
+      "Run the Context Rollover Guard offline self-test.",
+      "Inspect this project's context handoff state.",
+      "Resume this verified CRG handoff safely."
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}
