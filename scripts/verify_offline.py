@@ -49,8 +49,9 @@ if sys.platform.startswith('linux'):
     # Query the current network namespace, not an inherited sysfs mount.
     if sorted(name for _, name in socket.if_nameindex()) != ['lo']:
         raise RuntimeError('Expected isolated namespace with loopback only')
-    if len(Path('/proc/net/route').read_text().splitlines()) != 1:
-        raise RuntimeError('Unexpected route in isolated namespace')
+    routes = [line for line in Path('/proc/thread-self/net/route').read_text().splitlines() if line.strip()]
+    if len(routes) != 1 or not routes[0].startswith('Iface'):
+        raise RuntimeError('Unexpected route in isolated namespace: ' + repr(routes))
 s = socket.socket()
 s.settimeout(1)
 try:

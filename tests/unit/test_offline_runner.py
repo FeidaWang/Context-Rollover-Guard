@@ -41,11 +41,13 @@ class OfflineRunnerTests(unittest.TestCase):
             runner.assert_os_network({}, ROOT)
         code = run.call_args.args[0][-1]
         cases = (
-            ([(1, 'lo')], 'header\n', OSError(errno.ENETUNREACH, 'isolated'), None),
-            ([(1, 'lo'), (2, 'eth0')], 'header\n', None, RuntimeError),
-            ([(1, 'lo')], 'header\nroute\n', None, RuntimeError),
-            ([(1, 'lo')], 'header\n', None, RuntimeError),
-            ([(1, 'lo')], 'header\n', OSError(errno.ECONNREFUSED, 'reachable'), OSError),
+            ([(1, 'lo')], 'Iface\tDestination\n', OSError(errno.ENETUNREACH, 'isolated'), None),
+            ([(1, 'lo')], 'Iface\tDestination\n   \n', OSError(errno.ENETUNREACH, 'isolated'), None),
+            ([(1, 'lo'), (2, 'eth0')], 'Iface\n', None, RuntimeError),
+            ([(1, 'lo')], 'Iface\nroute\n', None, RuntimeError),
+            ([(1, 'lo')], '', None, RuntimeError),
+            ([(1, 'lo')], 'Iface\n', None, RuntimeError),
+            ([(1, 'lo')], 'Iface\n', OSError(errno.ECONNREFUSED, 'reachable'), OSError),
         )
         for interfaces, routes, error, expected in cases:
             with self.subTest(interfaces=interfaces, routes=routes, error=error), \
