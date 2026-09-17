@@ -1,30 +1,30 @@
 {
   "artifacts": {
-    "context-rollover-guard.zip": "df25c6bb05b2e6830c695e1ebf43f4dff682bc78338d0db9f2db3090a208cc80",
-    "context-rollover-guard/BUILD-INFO.json": "c76e56c7aad1eb84b6d774fe61eadf30406edcae9ad9c763950f87efa114698c",
+    "context-rollover-guard.zip": "d928c51e7179c1863663891f71003f5140beb9c2af54187e05a6faeed7d13265",
+    "context-rollover-guard/BUILD-INFO.json": "02084c0e0609e8fb961774b1e2ca1d899570484a1d7b7cb48d9987f2c6694709",
     "context-rollover-guard/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
     "context-rollover-guard/SKILL.md": "df3dc6ad73915c37e54f91d86f2a330a3d7afc2f5ba3837c4618c8767ecc5088",
     "context-rollover-guard/agents/openai.yaml": "bed3627877ea2c203593384ac9bd98ad15b5439228d22dfa40c5d65e919fc3c4",
     "context-rollover-guard/references/desktop.md": "3eeded588fe402ba385df5acec03d1f59964fdd5db527d32217c83a454c8b575",
     "context-rollover-guard/references/observe-sequence.jsonl": "026d8c769ae3ffa72e38b8551e722be125163e4545609b6df9455dda33d6f0fe",
     "context-rollover-guard/references/recovery.md": "20e068ca3a45f7a0a108150becb06a4560029279aa28adf9715092d83b9df166",
-    "context-rollover-guard/scripts/crg.pyz": "3772dff6fb69e2131daf1c3c002309a0a42220d73c76d04f8528fbe6b7818681",
+    "context-rollover-guard/scripts/crg.pyz": "7b22402b31ae7a80d336daba901358586fc148e382b8a3a3adf134a2f8854a01",
     "context-rollover-guard/scripts/self_test.py": "f41bb9b1e996da8bb043dc6cbba43614e4634d79a790d589925b84fabe04661f",
-    "context_rollover_guard-0.1.0-py3-none-any.whl": "e03b029624d71e392b342b1dd4d1f9a287cc3c0eab0582423e96789727cb640f",
-    "context_rollover_guard-0.1.0.tar.gz": "8ea835038efe5fa5f44270eb20268ee67f86005730b852035a6dc2b90d9a244d",
-    "crg.pyz": "3772dff6fb69e2131daf1c3c002309a0a42220d73c76d04f8528fbe6b7818681"
+    "context_rollover_guard-0.1.0-py3-none-any.whl": "c43c55bb22a1027e1d0c399dbcce9c63d186d8102f58ff5503db81a75b971b76",
+    "context_rollover_guard-0.1.0.tar.gz": "07efbd9a07ac11ffc232d8e112fe7ca22347a094e61ca47f540dc19de1826e7a",
+    "crg.pyz": "7b22402b31ae7a80d336daba901358586fc148e382b8a3a3adf134a2f8854a01"
   },
   "build": {
     "epoch": 1700000000,
     "generated_at": "2023-11-14T22:13:20+00:00",
     "package_version": "0.1.0",
     "requires_python": ">=3.11",
-    "source_commit": "a3943f6b5287da7666851b519f4b2a8cd253e9f0",
+    "source_commit": "d4aaface98dd63c990586ac355697ecfde21918f",
     "source_dirty": true,
     "source_files": {
       ".codex-plugin/plugin.json": "3e3109a30bcdd61ed4a742842f3e94fb0548563f65cd00fdd8d6da9a17078f5b",
       "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-      "README.md": "f3b7b8c46b61bce59970aa8339d41685728954e65fa739dabb7596409081aac3",
+      "README.md": "ac5582ee9015b52de9cd445d5e9940c9c5e5eb43008a78e23b31dcb5e7b11b4c",
       "crg/__init__.py": "7461ccafb2cf8d027b65b2c236a29d537398fb0dd3168c7e48435a57b7887c24",
       "crg/__main__.py": "79ee6f134c5c5193377cf9b189cbdcc3e2095e49ba9cec310114441c15a917c4",
       "crg/advice_render.py": "32cffad68c0340efd09cb0de8e45fea78779fbc61c497b1ebafe1647f4e1c194",
@@ -74,7 +74,7 @@
       "skills/context-rollover-guard/references/recovery.md": "20e068ca3a45f7a0a108150becb06a4560029279aa28adf9715092d83b9df166",
       "skills/context-rollover-guard/scripts/self_test.py": "f41bb9b1e996da8bb043dc6cbba43614e4634d79a790d589925b84fabe04661f"
     },
-    "source_sha256": "60f81ec9017f0e2614df84f64a1ab397bbf6981906477e2eaad17a7ed5326db6",
+    "source_sha256": "5e4ce605e5bfacd8144239267c7c932730ca8ab60bbc67f1034cec40d9013683",
     "toolchain": {
       "builder": "stdlib-v2",
       "compression": "stored ZIP; gzip level 9",

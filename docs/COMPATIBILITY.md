@@ -25,7 +25,7 @@ local command. Local macOS/Python 3.11–3.13 passed OS network isolation and
 offline verification; see `docs/audit/ci-os-macos-3.*-final.json`. Historical hosted
 [run 35226491499](https://github.com/FeidaWang/Context-Rollover-Guard/actions/runs/35226491499)
 passed five jobs and failed Linux 3.13, using an older runner and test snapshot.
-Current hosted push and same-repository PR matrices passed; see [current evidence](ci-acceptance.md). Cross-repository fork PR and manual release jobs remain NOT_RUN. The initial
+Current hosted push and same-repository PR matrices passed; see [current evidence](ci-acceptance.md). The manual release verification also passed; cross-repository fork PR remains NOT_RUN. The initial
 nested sandbox denial is retained as historical evidence; the approved local
 process-level sandbox now succeeds without changing global policy.
 Native Windows is unsupported/unverified. No new live compatibility badge or

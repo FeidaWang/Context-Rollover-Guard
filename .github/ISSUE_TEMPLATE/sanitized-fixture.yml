@@ -1,0 +1,43 @@
+name: Synthetic fixture contribution
+description: Propose one bounded, synthetic regression fixture without private data.
+title: '[Fixture] '
+body:
+  - type: markdown
+    attributes:
+      value: 'Do not paste prompts, answers, native transcripts, credentials, account IDs or private paths. Sensitive security findings must follow SECURITY.md instead.'
+  - type: input
+    id: contract
+    attributes:
+      label: One behavior or contract being tested
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Synthetic provenance and minimal fields
+      description: Explain how the data was authored and why every field is needed. Do not attach raw source logs.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior and test consumer
+      description: Name the existing or proposed test and its safety assertion.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification evidence
+      description: Give the commit, OS/Python, command, result and manifest changes. Use OFFLINE_TEST; do not claim live compatibility.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Public content review
+      options:
+        - label: I authored synthetic data and excluded private content, identifiers, credentials and native logs.
+          required: true
+        - label: I understand that passing a fixture does not prove live runtime compatibility.
+          required: true

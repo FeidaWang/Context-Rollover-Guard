@@ -74,7 +74,7 @@ Released under the [Apache License 2.0](LICENSE).
 
 ## Contributing and security
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes. Report security issues privately as described in [SECURITY.md](SECURITY.md).
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes. Read [SECURITY.md](SECURITY.md) before reporting sensitive findings; a verified private reporting channel is not currently available.
 
 ## Safe configuration
 
@@ -90,7 +90,7 @@ For all offline gates on a temporary clean Git snapshot of the current non-ignor
 python3.13 scripts/verify_offline.py --clean
 ```
 
-This excludes ignored machine evidence, isolates HOME/CODEX_HOME, rejects network and live-runtime launches during verification, runs unit and CLI integration tests, then builds and verifies every release artifact and self-tests both the skill directory and an extracted ZIP. CI covers Python 3.11–3.13 on Linux and macOS. With `--clean`, builds run inside the temporary checkout and leave working-tree artifacts unchanged. Run `python3 scripts/build_release.py` to regenerate the working-tree release artifacts.
+This excludes ignored machine evidence, isolates HOME/CODEX_HOME, builds final artifacts, runs unit and CLI integration tests, and verifies the exported skill ZIP, PYZ and wheel. Local audit mode rejects covered Python network and live-runtime launches; it is not an OS sandbox. Hosted CI separately requires and verifies OS network isolation. CI covers Python 3.11–3.13 on Linux and macOS. With `--clean`, builds run inside the temporary checkout and leave working-tree artifacts unchanged. Run `python3 scripts/build_release.py` to regenerate the working-tree release artifacts.
 
 ## Runtime paths and diagnosis
 
@@ -106,3 +106,43 @@ Uninstall/revert instructions are next to installation steps in the [contributor
 Offline `statistical-audit` and `resolve-model` commands, plus the injected-adapter reset transaction engine, are documented in [M4 contracts](docs/metrics/EXPERIMENTAL-M4.md). They do not activate an advanced policy or perform live reset redemption. See the [CRG-0301–0401 acceptance report](docs/implementation/CRG-0301-0401-RESULTS.md) for passing offline checks and outstanding real-data, runtime and Windows/attachment gates.
 
 Execution and recovery use local deduplication, durable submission intent, and no blind resend after ambiguous acceptance. They do not guarantee distributed exactly-once delivery. See [execution configuration and trust semantics](docs/architecture/execution-semantics.md) for archive policy, supported settings, and recovery limits.
+
+## Reproduce the offline demo (implemented, v0.1.0)
+
+From the checkout, with Python 3.11+:
+
+```sh
+python3 scripts/demo_offline.py
+```
+
+This invokes the shipped CLI from a separate temporary working directory, with an
+empty HOME/CODEX_HOME and no Codex on PATH. It creates disabled project settings,
+reads configuration and diagnosis, and verifies that a hook installation preview
+writes no hook file. It makes no model call. The preview dispatcher is a placeholder;
+this demo does not install or activate an integration. A final `result: PASS` means
+these four offline checks succeeded, not live runtime compatibility.
+
+## Continuity policies and control modes
+
+CRG starts disabled. After explicit enablement, `native_cooperative` lets native
+continuation proceed while preserving supported snapshots. `observe` performs no
+hook writes/interception; `manual_recovery` leaves handoff decisions to the user;
+`guarded_owned_rollover` requires an explicitly authorized, verified owned integration.
+Native compaction remains the runtime's responsibility; CRG preserves recovery
+content and reconciles ambiguous operations without blindly resending them.
+
+MODE_A is the conservative fallback. MODE_B requires verified lossless Stop payload,
+trusted hook execution and prompt interception. MODE_C additionally requires active
+transport ownership and verified fresh-task/workspace/acceptance/archive behavior.
+Setting a policy or mode does not establish those capabilities. No public hook adapter
+is currently certified for interception. A globally installed skill is not a global hook.
+See [policy details](docs/architecture/native-cooperative.md).
+
+Exact prompts and answers can exist in private recovery archives; file permissions
+are not encryption. Public fixtures are synthetic. Nothing uploads by default.
+Keep unresolved recovery journals when uninstalling; remove only receipt-owned hook
+entries as described in the [quickstart](docs/CONTRIBUTOR-QUICKSTART.md).
+
+Current [hosted acceptance evidence](docs/ci-acceptance.md) is scoped to offline tests.
+Cross-repository fork evidence, live/native activation and Windows support remain
+unverified. See [contribution tasks](docs/GOOD-FIRST-ISSUES.md) for bounded work.

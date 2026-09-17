@@ -33,5 +33,20 @@ accepts empty/header-only routes, and still rejects extra interfaces, populated 
 malformed route data, successful connections and unexpected socket errors.
 
 This is hosted synthetic/offline evidence. A same-repository PR is not a fork PR.
-Cross-repository fork acceptance, manual release workflow, live model/hook/Desktop
-compatibility and native Windows remain unverified. No live model was called.
+Cross-repository fork acceptance, live model/hook/Desktop compatibility and native
+Windows remain unverified. No live model was called.
+
+## Manual release verification
+
+[Manual run 35253749828](https://github.com/FeidaWang/Context-Rollover-Guard/actions/runs/35253749828)
+passed on `d4aaface98dd63c990586ac355697ecfde21918f`. This workflow only verifies
+source and final artifacts under Linux OS network isolation; it does not upload
+artifacts, publish a release or call a model.
+
+## Fork acceptance prerequisite
+
+An authenticated request to GitHub's official create-fork endpoint using a distinct
+name returned the original upstream repository with `fork: false` and no parent.
+It did not create a cross-repository fork, so no fork PR success is claimed. A
+writable repository in the fork network under another available account/organization
+is still required. The upstream URL and a same-repository PR do not satisfy this case.

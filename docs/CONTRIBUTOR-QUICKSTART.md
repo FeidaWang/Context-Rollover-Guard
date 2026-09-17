@@ -2,7 +2,7 @@
 
 Use Python 3.11+ and Git on Linux/macOS. No pip dependencies or Codex login are needed for offline verification. Windows is not yet verified; the runtime currently uses POSIX locking/private-file primitives.
 
-## Verify, then install
+## Verify, then install (implemented in v0.1.0)
 
 ```sh
 python3 --version
@@ -12,11 +12,15 @@ python3 scripts/build_release.py --verify
 python3 dist/context-rollover-guard/scripts/self_test.py
 ```
 
-The clean runner uses a temporary committed snapshot of non-ignored source, isolates user configuration, blocks network/live-runtime launches during verification, builds every artifact, and tests both the skill directory and exported ZIP. It does not change the original checkout's release artifacts. The explicit build command does.
+The clean runner uses an allowlisted disposable source snapshot without creating a commit. It isolates user configuration, builds final artifacts before testing, and verifies the exported skill ZIP, PYZ and wheel. Its Python audit guard is not an OS sandbox; hosted CI requires a separately verified OS network boundary. It does not change the original checkout's release artifacts. The explicit build command does.
 
 Install `dist/context-rollover-guard` through your skill installer, or copy that directory to a **new, unoccupied** skill directory of your choosing. Do not overwrite a different skill. Record the installation path. Installing the skill does not install hooks or create a background service.
 
 To uninstall a manually copied skill, remove only that recorded copy. For a plugin-managed installation, use that plugin manager's uninstall action. Existing handoff journals remain recovery data; retain them until pending work is reconciled. Do not reset a journal to force a retry.
+
+For an implemented preview with no hook writes, run `python3 scripts/demo_offline.py`.
+It uses a temporary workspace and placeholder dispatcher. A real adapter must supply
+its own verified dispatcher and binding; do not copy the placeholder into production.
 
 Hooks are a separate explicit integration. `install-hooks` previews a merge; `--apply` writes it and returns a rollback receipt. To reverse that installation, use:
 
@@ -71,3 +75,16 @@ No learning step makes an additional model call. Local computation, storage, and
 Follow [fixture guidance](../tests/fixtures/README.md). Never attach raw conversations, authentication files, native private journals, or account IDs to a public issue. A synthetic reproduction is preferable.
 
 Run the [continuity benchmark](benchmarks/README.md) and include failures as well as successes. Compatibility reports are evidence only for their stated runtime, surface, platform, and scope.
+
+## Scope and review
+
+All commands above are implemented v0.1.0 interfaces. Paths beginning with `/private`,
+`/projected`, `/absolute`, or `/exact`, and uppercase catalog/version values are
+placeholders requiring explicit local inputs; they are not a ready-to-run live demo.
+They do not certify the later ledger, accounting, forecast or compatibility roadmap.
+Use the isolated demo above for a copyable no-account walkthrough.
+
+[Bounded contribution tasks](GOOD-FIRST-ISSUES.md) include exact acceptance targets.
+Before merging, use the [maintainer checklist](MAINTAINER-CHECKLIST.md). Public
+architecture and CI summaries are separate from private `docs/context-rollover/`
+records and untracked local audit logs. Do not unignore private evidence directories.
