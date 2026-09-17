@@ -1,19 +1,20 @@
 # Maintainer review packet — offline scope
 
 This supplements the existing narrative draft without overwriting maintainer edits.
-Submission, credit amount, program eligibility and approval remain unverified.
+Submission and approval remain outstanding; no credit amount is requested here.
 Private form fields (email, organization ID) must be supplied by the maintainer
-outside this public repository. Recheck the current form's exact limits before
-submission; the 500-character draft limit below is a local packaging constraint.
+outside this public repository. The official form was reviewed on 2026-09-18: each narrative answer allows 500
+characters. Use the current [field-specific answers](FORM-ANSWERS.md) and
+[eligibility review](ELIGIBILITY-REVIEW.md); recheck before submission.
 
-## Short description (local cap: 500 characters)
+## Project description (background, not a complete form answer)
 
 Context Rollover Guard provides conservative local recovery and content-free usage analytics for long-running Codex work. It preserves exact handoff bytes, avoids blind replay after uncertain submissions, and checks public distribution artifacts offline. Our current evidence covers synthetic protocol tests and isolated Linux/macOS CI. Live account adapters, calibrated productivity gains, and independent adoption are not yet established.
 
 ## Review evidence
 
 - [Support matrix](../COMPATIBILITY.md) separates verified and unsupported surfaces.
-- [Public CI run on 99daeac](https://github.com/FeidaWang/Context-Rollover-Guard/actions/runs/35254299216): prior six-job Linux/macOS acceptance, not certification of subsequent edits.
+- [Public CI run on f6f5b61](https://github.com/FeidaWang/Context-Rollover-Guard/actions/runs/35257618983): six Linux/macOS jobs; each 364 unit + 6 integration tests and three artifact smoke checks. This verifies that commit, not subsequent edits.
 - [CI policy](../ci-policy.md) and [source workflows](../../.github/workflows/ci.yml).
 - [Reproducible demo](../../scripts/demo_offline.py) and [offline evaluations](../evaluations/summary.md).
 - [Maintenance plan](MAINTENANCE-PLAN.md), [bounded credit methodology](API-CREDIT-PLAN.md), and [privacy](../privacy.md).

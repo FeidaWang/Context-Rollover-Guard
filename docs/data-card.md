@@ -1,7 +1,7 @@
 # Synthetic timing dataset v1
 
 Status: public-code synthetic benchmark asset; no real contributor data collected.
-License: repository MIT license. Provenance: hand-authored numeric generator at
+License: repository Apache License 2.0. Provenance: hand-authored numeric generator at
 `benchmarks/datasets/generate.py`, using the reviewed typed interchange projection.
 Reproduction creates new bundle/cluster/record aliases; identical hashes are not
 expected across bundles. No local account IDs, prompts, answers, native logs,

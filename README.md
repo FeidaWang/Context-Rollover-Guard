@@ -2,157 +2,121 @@
 
 [简体中文](README.zh-CN.md) · English
 
-Context Rollover Guard (CRG) is an open-source Codex skill and Python runtime for handling long-running work safely when a context rollover is approaching or a prior handoff must be resumed.
+**A handoff notebook for long Codex tasks.** Context Rollover Guard (CRG) is a community-built Python tool and optional Codex skill. It helps inspect saved recovery state, verify handoff files, and avoid repeating an operation whose outcome is uncertain.
 
-It is deliberately conservative: it preserves the original task, records a durable handoff, and requires positive evidence before treating an uncertain operation as accepted. It never silently replays a prompt or claims that it has switched the active Codex Desktop task.
+Imagine helping someone build a big LEGO model. When a new helper takes over, they need the instructions, what is already finished, and what still needs checking. CRG provides tools for that handoff. It does **not** give Codex unlimited memory, and installing it does **not** automatically move your conversation to a new task.
 
-## What it does
+## What can I use today?
 
-- Runs a self-contained, dependency-free Python runtime on Python 3.11+.
-- Inspects explicit project configuration, hook state, and existing recovery journals.
-- Creates and verifies durable handoff archives when used by an authorized integration.
-- Uses `tokenUsage.last.totalTokens` for active-context pressure when a supported runtime provides it; it never substitutes cumulative session usage.
-- Stops safely on ambiguous acceptance rather than sending a duplicate prompt.
+| Your goal | What is available |
+|---|---|
+| Try it without connecting an account | A temporary, synthetic offline demo |
+| Check a project's CRG setup | Read-only configuration and recovery diagnosis |
+| Continue an existing handoff | Verify its archive, then resume in a new task in the same workspace |
+| Review usage | Explicitly import supported numeric records; see the [analytics guide](docs/quickstart.md) |
+| Automatically guard any Desktop conversation | Not currently supported; requires a separately verified integration |
 
-## What it does not do
+**Requirements:** Python 3.11 or newer. Offline CI covers Linux and macOS with Python 3.11–3.13. Native Windows is unsupported; WSL is not independently certified. These are CRG's boundaries, not Codex's platform requirements. CRG is not an official OpenAI product.
 
-- It does not install global hooks or background services when imported or tested.
-- It does not provide universal token telemetry; that depends on the active Codex runtime and explicit project integration.
-- It does not take over the currently open Codex Desktop task or switch the UI automatically.
-- It does not resend a message, reset a journal, or archive an old task merely because a readback is missing.
+## Start here: a safe demo
 
-## Install the skill
-
-The portable skill lives in [`dist/context-rollover-guard`](dist/context-rollover-guard). Install that directory using your Codex skill or plugin workflow, then invoke it in a task as `$context-rollover-guard`.
-
-For a local inspection before installing:
+Download this repository using GitHub's **Code → Download ZIP**, extract it, and open the extracted folder. If you already use Git, you can instead run:
 
 ```sh
+git clone https://github.com/FeidaWang/Context-Rollover-Guard.git
+cd Context-Rollover-Guard
+```
+
+### If you use Codex Desktop
+
+1. Open the downloaded repository folder as a local project in Codex Desktop.
+2. Start a task in that folder and paste this request:
+
+   ```text
+   Read README.md. Check that Python 3.11+ is available, then run
+   python3 scripts/demo_offline.py and explain the result simply.
+   Do not install hooks or enable live integration.
+   ```
+
+3. Look for `result: PASS` in the command output. That means four offline checks succeeded: create disabled settings, read settings, diagnose the workspace, and preview hook configuration without installing it.
+
+The Python demo makes no model/API calls and needs no Codex login. Asking Codex to run it still uses your normal Codex conversation allowance. If Python is missing, install Python 3.11+ using the [official Python downloads](https://www.python.org/downloads/), then retry.
+
+### If you use a terminal or Codex CLI
+
+A terminal is the app where you type commands. Open it in the downloaded repository folder, then run these one at a time:
+
+```sh
+python3 --version
+python3 scripts/demo_offline.py
 python3 dist/context-rollover-guard/scripts/self_test.py
-python3 dist/context-rollover-guard/scripts/crg.pyz --help
 ```
 
-The repository root also includes a Codex plugin manifest, so plugin-aware tooling can discover the bundled skill at `dist/`.
+The first command must report 3.11 or newer. The demo should report `PASS`; the self-test should finish successfully. Neither installs CRG into Codex. You can run them before installing Codex CLI. For Codex itself, follow the [official setup guide](https://developers.openai.com/codex/quickstart).
 
-## First use
+## Optional: let Codex use the skill
 
-Ask Codex:
+A **skill** is a small instruction folder Codex can read. The ready-to-install folder is [`dist/context-rollover-guard`](dist/context-rollover-guard); it includes the Python runtime.
+
+In Codex, ask the skill installer:
 
 ```text
-Use $context-rollover-guard to run the offline self-test and report the result.
+Use skill-installer to install the skill from
+https://github.com/FeidaWang/Context-Rollover-Guard/tree/main/dist/context-rollover-guard.
+If a copy already exists, stop and show me its location instead of overwriting it.
 ```
 
-The self-test uses synthetic events in a temporary directory. It does not consume model usage, install hooks, or prove automatic Desktop switching.
+Check the proposed installation location before accepting it. Then select `context-rollover-guard` in your client's skill picker. In Codex CLI, use `/skills` or type `$context-rollover-guard`. If it is missing, restart Codex and check again. See [OpenAI's skill instructions](https://developers.openai.com/codex/skills) and our [manual installation/uninstall guide](docs/CONTRIBUTOR-QUICKSTART.md).
 
-To inspect a project:
+For the first request, say:
 
 ```text
-Use $context-rollover-guard to inspect this project's configuration, hooks, and handoff state.
+Use the context-rollover-guard skill to run its offline self-test.
+Then explain what passed and what remains unverified.
 ```
 
-To continue a saved handoff, create a new task in the same workspace and provide the exact path to its `handoff.md`. Keep the source task until the new task has safely taken over.
+Installing a skill adds instructions and scripts. It does not install hooks, start a background monitor, or enable automatic recovery. A **hook** is a separate integration that runs code when an event happens; beginners do not need one for the demo.
 
-## Development
+## Check your own project
+
+From this repository folder, run the following command. Replace `/absolute/path/to/your-project` with the real folder path; keep the quotes if it contains spaces.
 
 ```sh
-python3 -m unittest discover -s tests/unit -v
+python3 dist/context-rollover-guard/scripts/crg.pyz doctor --workspace "/absolute/path/to/your-project" --format human
+```
+
+`doctor` checks CRG's setup without enabling it. `UNKNOWN` means there is not enough evidence; it does not mean the guard is active. If you want a starter configuration, `init` creates a disabled `crg.toml` and refuses to overwrite an existing file:
+
+```sh
+python3 dist/context-rollover-guard/scripts/crg.pyz init --workspace "/absolute/path/to/your-project"
+```
+
+A **workspace** is your project folder. A **handoff** is a saved package describing work to continue. If an authorized integration has already created a handoff, open a **new task in the same workspace**, supply the exact path to `handoff.md`, and ask CRG to verify the archive before continuing. Keep the original task and recovery files until the outcome is confirmed. The demo does not create a handoff of your real conversation.
+
+## Important limits, in plain language
+
+- CRG starts disabled. Changing `enabled` alone does not establish a working integration. No public hook adapter is currently certified for prompt interception.
+- If a message may already have been accepted, CRG stops to check rather than sending it again. This reduces duplicate-operation risk; it is not an exactly-once delivery guarantee.
+- Codex handles its own context compaction. CRG cannot enlarge the context window or guarantee lossless recovery on every client.
+- Context space, token usage, and account quota are different things. CRG does not automatically read all chats or your live account balance. Forecasts are experimental; missing evidence stays unknown.
+- Recovery archives may contain exact prompts and answers. Keep them private. File permissions are not encryption. Nothing uploads by default. Public test data is synthetic.
+- Uninstall using the same manager that installed the skill, or remove only your recorded manual copy. Preserve unresolved recovery files. Separately installed hooks need their own [receipt-based rollback](docs/CONTRIBUTOR-QUICKSTART.md).
+
+## For contributors
+
+The runtime uses only the Python standard library. To reproduce the offline suite and rebuild the repository's distribution files:
+
+```sh
+python3 scripts/verify_offline.py --clean
 python3 scripts/build_release.py
 python3 scripts/build_release.py --verify
 ```
 
-The root runtime is standard-library only. `pip` packaging is optional and declared in [`pyproject.toml`](pyproject.toml). Local journals, handoffs, test workspaces, and machine-specific evidence are intentionally excluded from Git.
+The clean runner tests a disposable source snapshot. Its local Python network guard is not an OS sandbox; hosted CI separately verifies OS network isolation. Passing offline tests does not certify a live Codex session. See [recorded CI evidence](docs/ci-acceptance.md) and the [support matrix](docs/COMPATIBILITY.md).
 
-## Safety model
-
-CRG treats unknown outcomes as recovery work, not permission to retry. A recovery operation is read-only unless an already-authorized owning integration advances a positively verified transaction. This design is especially important for prompts that could have been accepted even when their result is not yet visible.
-
-See the bundled skill references for operational guidance: [`desktop.md`](dist/context-rollover-guard/references/desktop.md) and [`recovery.md`](dist/context-rollover-guard/references/recovery.md).
-
-## License
+- [Contributor quickstart](docs/CONTRIBUTOR-QUICKSTART.md) · [Good first contributions](docs/GOOD-FIRST-ISSUES.md)
+- [Recovery details](dist/context-rollover-guard/references/recovery.md) · [Desktop boundaries](dist/context-rollover-guard/references/desktop.md)
+- [Analytics walkthrough](docs/quickstart.md) · [Privacy](docs/privacy.md) · [Architecture](docs/architecture/native-cooperative.md)
+- [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
 
 Released under the [Apache License 2.0](LICENSE).
-
-## Contributing and security
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes. Read [SECURITY.md](SECURITY.md) before reporting sensitive findings; a verified private reporting channel is not currently available.
-
-## Safe configuration
-
-A clean checkout is disabled (`enabled = false`, `mode = "auto"`); emergency prompt and compaction blocking are opt-in. Installing the skill does not install hooks. Guarding requires explicit enablement plus a separately configured, verified integration; setting `enabled` alone does not prove activation.
-
-Keep machine-specific runtime paths in `$CODEX_HOME/context-rollover.toml` (default `~/.codex/context-rollover.toml`), under `[context_rollover]` as `codex_binary`. If absent, runtime probes discover `codex` through PATH. Repository values override user values; CLI overrides apply last.
-
-Run `python3.13 -m crg config --workspace .` to inspect effective values and per-field `sources` (`default`, `user`, `repo`, `cli`). This reads only CRG settings, never Codex credentials, and does not probe or install anything. `--codex PATH` overrides the runtime path for this inspection. Python 3.11+ is required; use an appropriate interpreter on your system.
-
-For all offline gates on a temporary clean Git snapshot of the current non-ignored source files:
-
-```sh
-python3.13 scripts/verify_offline.py --clean
-```
-
-This excludes ignored machine evidence, isolates HOME/CODEX_HOME, builds final artifacts, runs unit and CLI integration tests, and verifies the exported skill ZIP, PYZ and wheel. Local audit mode rejects covered Python network and live-runtime launches; it is not an OS sandbox. Hosted CI separately requires and verifies OS network isolation. CI covers Python 3.11–3.13 on Linux and macOS. With `--clean`, builds run inside the temporary checkout and leave working-tree artifacts unchanged. Run `python3 scripts/build_release.py` to regenerate the working-tree release artifacts.
-
-## Runtime paths and diagnosis
-
-For a new workspace without `crg.toml`, `python3.13 -m crg init --workspace /path/to/project` creates disabled configuration only. Existing files are never overwritten. Inspect with `python3.13 -m crg doctor --workspace /path/to/project` (JSON), or add `--format human`. Ordinary diagnosis is read-only; hook trust, telemetry, and enabled-session activation remain unknown without fresh evidence.
-
-Runtime cache and receipts now default beneath the configured state root, independently of the source checkout. Existing evidence needs explicit path configuration; `doctor --evidence PATH` remains available. See [CRG-0103 paths, status semantics, and migration](docs/implementation/CRG-0103-RESULTS.md) before changing an existing integration. `doctor --probe` is a separate explicit runtime operation, not part of installation or ordinary inspection.
-
-Uninstall/revert instructions are next to installation steps in the [contributor quickstart](docs/CONTRIBUTOR-QUICKSTART.md). Preserve pending recovery journals; skill removal does not uninstall separately installed hooks.
-
-
-### Experimental M4 evaluation
-
-Offline `statistical-audit` and `resolve-model` commands, plus the injected-adapter reset transaction engine, are documented in [M4 contracts](docs/metrics/EXPERIMENTAL-M4.md). They do not activate an advanced policy or perform live reset redemption. See the [CRG-0301–0401 acceptance report](docs/implementation/CRG-0301-0401-RESULTS.md) for passing offline checks and outstanding real-data, runtime and Windows/attachment gates.
-
-Execution and recovery use local deduplication, durable submission intent, and no blind resend after ambiguous acceptance. They do not guarantee distributed exactly-once delivery. See [execution configuration and trust semantics](docs/architecture/execution-semantics.md) for archive policy, supported settings, and recovery limits.
-
-## Reproduce the offline demo (implemented, v0.1.0)
-
-From the checkout, with Python 3.11+:
-
-```sh
-python3 scripts/demo_offline.py
-```
-
-This invokes the shipped CLI from a separate temporary working directory, with an
-empty HOME/CODEX_HOME and no Codex on PATH. It creates disabled project settings,
-reads configuration and diagnosis, and verifies that a hook installation preview
-writes no hook file. It makes no model call. The preview dispatcher is a placeholder;
-this demo does not install or activate an integration. A final `result: PASS` means
-these four offline checks succeeded, not live runtime compatibility.
-
-## Continuity policies and control modes
-
-CRG starts disabled. After explicit enablement, `native_cooperative` lets native
-continuation proceed while preserving supported snapshots. `observe` performs no
-hook writes/interception; `manual_recovery` leaves handoff decisions to the user;
-`guarded_owned_rollover` requires an explicitly authorized, verified owned integration.
-Native compaction remains the runtime's responsibility; CRG preserves recovery
-content and reconciles ambiguous operations without blindly resending them.
-
-MODE_A is the conservative fallback. MODE_B requires verified lossless Stop payload,
-trusted hook execution and prompt interception. MODE_C additionally requires active
-transport ownership and verified fresh-task/workspace/acceptance/archive behavior.
-Setting a policy or mode does not establish those capabilities. No public hook adapter
-is currently certified for interception. A globally installed skill is not a global hook.
-See [policy details](docs/architecture/native-cooperative.md).
-
-Exact prompts and answers can exist in private recovery archives; file permissions
-are not encryption. Public fixtures are synthetic. Nothing uploads by default.
-Keep unresolved recovery journals when uninstalling; remove only receipt-owned hook
-entries as described in the [quickstart](docs/CONTRIBUTOR-QUICKSTART.md).
-
-Current [hosted acceptance evidence](docs/ci-acceptance.md) is scoped to offline tests.
-Cross-repository fork evidence, live/native activation and Windows support remain
-unverified. See [contribution tasks](docs/GOOD-FIRST-ISSUES.md) for bounded work.
-
-### Normalized analytics and local forecasts
-
-The [local analytics guide](docs/quickstart.md) covers bounded normalized imports,
-calendar-week status, preview-approved numeric exports and pre-execution baseline
-forecasts. Account activity remains unsupported without a verified official adapter;
-raw native transcript schemas are not inferred. See [offline evidence](docs/evaluations/summary.md),
-[forecast limitations](docs/evaluations/forecast-quality.md) and [privacy](docs/privacy.md).
-The [synthetic dataset](docs/data-card.md) contains no contributor logs. Native Windows
-remains unsupported; reset adapters remain disabled by default and experimental.

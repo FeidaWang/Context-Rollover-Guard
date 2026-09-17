@@ -50,3 +50,15 @@ name returned the original upstream repository with `fork: false` and no parent.
 It did not create a cross-repository fork, so no fork PR success is claimed. A
 writable repository in the fork network under another available account/organization
 is still required. The upstream URL and a same-repository PR do not satisfy this case.
+
+## Expanded local feature batch
+
+[Run 35257618983](https://github.com/FeidaWang/Context-Rollover-Guard/actions/runs/35257618983)
+passed on `f6f5b6118339d23d085d7a9c69597afec7f603a3`. All six Linux/macOS
+Python 3.11–3.13 jobs passed, each with 364 unit + 6 integration tests, zero
+failures/skips, verified OS network isolation and three artifact smoke checks.
+Counts overlap across jobs. This adds offline analytics and forecast coverage;
+it does not certify live model behavior or native Windows.
+
+The maintainer explicitly waived the unavailable true-fork acceptance case and
+skipped native Windows work in this local batch. Neither is a test PASS.

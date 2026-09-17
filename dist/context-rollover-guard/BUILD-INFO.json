@@ -3,12 +3,12 @@
   "generated_at": "2023-11-14T22:13:20+00:00",
   "package_version": "0.1.0",
   "requires_python": ">=3.11",
-  "source_commit": "99daeaccc058731c8516422ba8d271f3b2211c02",
+  "source_commit": "f6f5b6118339d23d085d7a9c69597afec7f603a3",
   "source_dirty": true,
   "source_files": {
     ".codex-plugin/plugin.json": "3e3109a30bcdd61ed4a742842f3e94fb0548563f65cd00fdd8d6da9a17078f5b",
     "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-    "README.md": "cd0c57182a065fb53f3791f964afd23309012f006b3adb3059e06e8924c6e2b5",
+    "README.md": "0c66faced107b212ef604cb840d06046cf41e730cdc5af20ba36cfb0198b5c52",
     "crg/__init__.py": "7461ccafb2cf8d027b65b2c236a29d537398fb0dd3168c7e48435a57b7887c24",
     "crg/__main__.py": "79ee6f134c5c5193377cf9b189cbdcc3e2095e49ba9cec310114441c15a917c4",
     "crg/account.py": "9c9309f7c92fb5998458b1f3f6c6d33dea20c045ca78bb8807deaa617e1d75ef",
@@ -69,7 +69,7 @@
     "skills/context-rollover-guard/references/recovery.md": "20e068ca3a45f7a0a108150becb06a4560029279aa28adf9715092d83b9df166",
     "skills/context-rollover-guard/scripts/self_test.py": "f41bb9b1e996da8bb043dc6cbba43614e4634d79a790d589925b84fabe04661f"
   },
-  "source_sha256": "23027502bda81128aa372379891fbf586b8f0c04b857238b168f4886c8f7e3e1",
+  "source_sha256": "06220dd67c6929bba4faca0e458ebc1d45652ea86b44dcd7320945f44ad846f6",
   "toolchain": {
     "builder": "stdlib-v2",
     "compression": "stored ZIP; gzip level 9",

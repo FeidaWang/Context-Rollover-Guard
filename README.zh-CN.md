@@ -1,137 +1,122 @@
 # Context Rollover Guard
 
-[English](README.md) · 简体中文
+简体中文 · [English](README.md)
 
-Context Rollover Guard（CRG）是一个开源的 Codex skill 与 Python 运行时，用于在长任务接近上下文切换、或需要恢复已有交接时，以可验证且保守的方式延续工作。
+**给 Codex 长任务准备一本交接笔记。** Context Rollover Guard（简称 CRG）是社区开发的 Python 工具，也可以作为 Codex 技能使用。它能检查已保存的恢复状态、验证交接文件，并避免在结果不明确时重复执行操作。
 
-它会保留原始任务、写入可持久化验证的交接信息，并且只有在存在正向证据时才把不确定的操作视为已接受。它不会偷偷重发提示词，也不会声称已经切换了当前 Codex Desktop 的任务。
+想象你和别人一起搭一个很大的乐高模型。换人接着搭时，新人需要知道：原来的要求是什么、已经搭好了哪些、还有什么需要检查。CRG 提供的就是这类交接工具。它**不会让 Codex 拥有无限记忆**，安装后也**不会自动把对话搬到新任务里**。
 
-## 能做什么
+## 现在可以做什么？
 
-- 在 Python 3.11+ 上运行无第三方依赖的独立运行时。
-- 检查明确指定项目的配置、Hook 状态与已有恢复日志。
-- 在已授权的集成中创建并验证可持久化的交接归档。
-- 当运行时支持时，使用 `tokenUsage.last.totalTokens` 判断活动上下文压力；绝不将累计 session 用量冒充活动上下文。
-- 操作是否已接受存在歧义时安全停止，而不是重复发送提示词。
+| 你的需求 | 目前能做到什么 |
+|---|---|
+| 不连接账号，先试一试 | 使用临时目录和模拟数据运行离线演示 |
+| 检查项目中的 CRG 设置 | 只读检查配置和恢复状态 |
+| 接着已有的交接记录工作 | 先验证归档，再在同一工作区的新任务中继续 |
+| 查看用量 | 主动导入受支持的数字记录，见[用量指南](docs/quickstart.md) |
+| 自动保护 Desktop 的所有对话 | 目前不支持；需要另外配置并验证集成 |
 
-## 不做什么
+**运行要求：** Python 3.11 或更新版本。离线 CI 已覆盖 Linux、macOS 上的 Python 3.11–3.13。原生 Windows 暂不支持，WSL 也未经过独立验收。这是 CRG 的支持范围，不代表 Codex 本身的平台要求。CRG 不是 OpenAI 官方产品。
 
-- 导入或运行测试时不会安装全局 Hook 或后台服务。
-- 不提供通用 token 遥测；这取决于当前 Codex 运行时与明确的项目集成。
-- 不会接管当前打开的 Codex Desktop 任务，也不会自动切换界面。
-- 不会因为缺少一次 readback 就重发消息、重置日志或归档旧任务。
+## 从这里开始：安全地试一次
 
-## 安装 skill
-
-便携式 skill 位于 [`dist/context-rollover-guard`](dist/context-rollover-guard)。请使用你的 Codex skill 或 plugin 安装流程安装该目录，随后可在任务中通过 `$context-rollover-guard` 调用。
-
-安装前可在本地检查：
+在 GitHub 页面点击 **Code → Download ZIP**，解压后打开文件夹。如果你已经会用 Git，也可以运行：
 
 ```sh
+git clone https://github.com/FeidaWang/Context-Rollover-Guard.git
+cd Context-Rollover-Guard
+```
+
+### 使用 Codex Desktop 的朋友
+
+1. 在 Codex Desktop 中，把下载并解压的仓库文件夹打开为本地项目。
+2. 在该文件夹中新建任务，粘贴：
+
+   ```text
+   阅读 README.zh-CN.md，确认有 Python 3.11 或更新版本，然后运行
+   python3 scripts/demo_offline.py，用简单的话解释结果。
+   不要安装 hooks，也不要启用实时集成。
+   ```
+
+3. 在命令输出中寻找 `result: PASS`。它表示四个离线检查通过：创建默认关闭的配置、读取配置、检查工作区，以及只预览 hook 配置而不安装。
+
+Python 演示本身不调用模型或 API，也不需要登录 Codex。但让 Codex 帮你执行命令，仍会使用正常的 Codex 对话额度。如果缺少 Python，请从 [Python 官方下载页](https://www.python.org/downloads/)安装 3.11 或更新版本后重试。
+
+### 使用终端或 Codex CLI 的朋友
+
+终端就是输入命令的应用。在下载的仓库文件夹中打开终端，依次运行：
+
+```sh
+python3 --version
+python3 scripts/demo_offline.py
 python3 dist/context-rollover-guard/scripts/self_test.py
-python3 dist/context-rollover-guard/scripts/crg.pyz --help
 ```
 
-仓库根目录同时包含 Codex plugin manifest，支持 plugin 的工具可从 `dist/` 发现这个 skill。
+第一条应显示 3.11 或更新版本。演示应显示 `PASS`，自检应成功结束。这些命令不会把 CRG 安装进 Codex；甚至还没安装 Codex CLI 也能运行。Codex 本身的安装请参考[官方入门指南](https://developers.openai.com/codex/quickstart)。
 
-## 第一次使用
+## 可选：让 Codex 使用这个技能
 
-可以对 Codex 说：
+**技能（skill）**就是 Codex 可以阅读的一小份操作说明和工具。可安装的完整目录是 [`dist/context-rollover-guard`](dist/context-rollover-guard)，其中已经包含 Python 运行程序。
+
+在 Codex 中告诉技能安装器：
 
 ```text
-使用 $context-rollover-guard 运行离线自测，并告诉我是否通过。
+使用 skill-installer 安装下面这个地址中的技能：
+https://github.com/FeidaWang/Context-Rollover-Guard/tree/main/dist/context-rollover-guard
+如果已经安装过，先停下来告诉我位置，不要覆盖已有副本。
 ```
 
-自测使用临时目录中的合成事件；不会消耗模型用量、安装 Hook，也不能证明 Desktop 已支持自动切换。
+确认安装器建议的位置后再接受安装。然后在客户端的技能选择器中选择 `context-rollover-guard`。Codex CLI 可以输入 `/skills` 或 `$context-rollover-guard`。如果找不到，重启 Codex 后再检查。另见 [OpenAI 技能说明](https://developers.openai.com/codex/skills)及本项目的[手动安装和卸载指南](docs/CONTRIBUTOR-QUICKSTART.md)。
 
-检查项目时可使用：
+第一次可以这样说：
 
 ```text
-使用 $context-rollover-guard 检查当前项目的配置、Hooks 和交接状态。
+使用 context-rollover-guard 技能运行离线自检。
+告诉我哪些检查通过了，哪些能力还没有验证。
 ```
 
-要继续一个已保存交接，请在相同工作区创建新任务，并提供其 `handoff.md` 的准确路径。新任务可靠接手前，请保留源任务。
+安装技能只会增加说明和脚本，不会安装 hooks、启动后台监控或开启自动恢复。**Hook** 是“发生某个事件时运行代码”的另外一层集成；初学者体验演示不需要它。
 
-## 开发
+## 检查你自己的项目
+
+在本仓库文件夹中运行下面的命令。把 `/absolute/path/to/your-project` 换成你项目文件夹的真实完整路径；路径含空格时保留双引号。
 
 ```sh
-python3 -m unittest discover -s tests/unit -v
+python3 dist/context-rollover-guard/scripts/crg.pyz doctor --workspace "/absolute/path/to/your-project" --format human
+```
+
+`doctor` 只检查 CRG 配置，不会启用保护。看到 `UNKNOWN`，表示证据还不够，不能理解成保护已经开启。如果需要初始配置，`init` 会创建默认关闭的 `crg.toml`，已有文件则不会覆盖：
+
+```sh
+python3 dist/context-rollover-guard/scripts/crg.pyz init --workspace "/absolute/path/to/your-project"
+```
+
+**工作区（workspace）**就是项目文件夹。**交接记录（handoff）**是保存下来、供后续继续工作的资料包。如果经授权的集成已经生成交接记录，请在**同一工作区创建新任务**，提供 `handoff.md` 的准确路径，让 CRG 先验证归档再继续。结果确认之前，保留原任务和恢复文件。前面的演示不会替你的真实对话生成交接记录。
+
+## 几个容易误会的地方
+
+- CRG 默认关闭。只把 `enabled` 改成开启，不代表集成已经生效。目前没有经过认证、可以拦截提示词的公共 hook 适配器。
+- 如果无法确定消息是否已经被接受，CRG 会先停下来核查，不直接重发。这有助于降低重复操作的风险，但不是“绝对只执行一次”的保证。
+- Codex 自己负责压缩上下文。CRG 不能扩大上下文窗口，也不能保证所有客户端都能无损恢复。
+- 上下文空间、token 用量、账号额度是不同的东西。CRG 不会自动读取所有聊天或实时账号余额。预测功能仍属实验性质；没有证据时会显示未知。
+- 恢复归档可能保存完整提示词和回答，请保存在私有位置。文件权限不等于加密。默认不会上传数据，公开测试数据均为模拟数据。
+- 通过原安装器卸载技能，或只移除自己记录下来的手动安装副本。保留尚未处理完的恢复文件。另行安装的 hooks 需要按[安装凭据回滚](docs/CONTRIBUTOR-QUICKSTART.md)。
+
+## 想参与开发？
+
+运行程序只依赖 Python 标准库。下面的命令可复现离线测试，并重新构建仓库中的分发文件：
+
+```sh
+python3 scripts/verify_offline.py --clean
 python3 scripts/build_release.py
 python3 scripts/build_release.py --verify
 ```
 
-根目录运行时只使用 Python 标准库；可选的 `pip` 打包配置位于 [`pyproject.toml`](pyproject.toml)。本地日志、交接、测试工作区和机器特定证据已刻意排除在 Git 之外。
+测试器会在临时源码副本中运行。本地 Python 网络防护不等于操作系统沙箱；托管 CI 会另外验证操作系统级网络隔离。离线测试通过，不代表真实 Codex 会话已通过兼容性认证。详见 [CI 验证记录](docs/ci-acceptance.md)与[支持范围](docs/COMPATIBILITY.md)。
 
-## 安全模型
+- [贡献者入门](docs/CONTRIBUTOR-QUICKSTART.md) · [适合首次贡献的任务](docs/GOOD-FIRST-ISSUES.md)
+- [恢复细节](dist/context-rollover-guard/references/recovery.md) · [Desktop 使用边界](dist/context-rollover-guard/references/desktop.md)
+- [用量分析指南](docs/quickstart.md) · [隐私说明](docs/privacy.md) · [架构说明](docs/architecture/native-cooperative.md)
+- [贡献须知](CONTRIBUTING.md) · [安全问题报告](SECURITY.md)
 
-CRG 将未知结果视为恢复工作，而不是重试授权。除非已获授权的拥有方集成推进一笔已正向验证的事务，否则恢复操作保持只读。对“提示词可能已被接受、但结果暂不可见”的情况，这一点尤其重要。
-
-操作细节请参阅随 skill 发布的参考资料：[`desktop.md`](dist/context-rollover-guard/references/desktop.md) 与 [`recovery.md`](dist/context-rollover-guard/references/recovery.md)。
-
-## 许可证
-
-本项目采用 [Apache License 2.0](LICENSE)。
-
-## 贡献与安全问题
-
-提交变更前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。报告敏感问题前请阅读 [SECURITY.md](SECURITY.md)；当前尚无已验证的私密报告渠道。
-
-## 安全配置
-
-新检出的仓库默认禁用（`enabled = false`、`mode = "auto"`），提示词与压缩阻断均须显式开启。安装 skill 不会安装 hooks。守护功能需要显式启用及单独配置、验证的集成；`enabled` 本身不代表已激活。
-
-机器专用运行时路径放在 `$CODEX_HOME/context-rollover.toml`（默认 `~/.codex/context-rollover.toml`）的 `[context_rollover]` / `codex_binary` 中。未指定时探测通过 PATH 查找 `codex`。仓库配置覆盖用户配置，CLI 覆盖最后生效。
-
-运行 `python3.13 -m crg config --workspace .` 查看有效值及各字段的 `sources`（`default`、`user`、`repo`、`cli`）。命令只读 CRG 设置，不读取 Codex 凭据、不探测或安装运行时。`--codex PATH` 仅覆盖本次查看的路径。要求 Python 3.11+，请使用本机对应解释器。
-
-运行 `python3.13 scripts/verify_offline.py --clean` 可将当前未忽略的源码复制到临时干净 Git 检出，隔离 HOME/CODEX_HOME，先构建最终制品，再执行单元测试、CLI 集成测试及导出的 skill ZIP、PYZ 和 wheel 校验。本地审计模式拒绝所覆盖的 Python 网络操作及真实运行时启动，但不等于操作系统沙箱；托管 CI 另行强制并验证操作系统网络隔离。CI 配置覆盖 Linux/macOS 的 Python 3.11–3.13；使用 `--clean` 时构建发生在临时检出中，不修改工作区产物；运行 `python3 scripts/build_release.py` 可统一更新工作区发布产物。
-
-## 运行时路径与诊断
-
-对于尚无 `crg.toml` 的工作区，`python3.13 -m crg init --workspace /项目路径` 只创建默认禁用的配置，拒绝覆盖已有文件。`python3.13 -m crg doctor --workspace /项目路径` 默认输出 JSON，加上 `--format human` 可显示简明文本。普通诊断只读；没有新证据时，hooks 信任、遥测可用性和已启用会话的实际激活状态保持未知。
-
-缓存及回执目录默认位于配置的 state root 下，不再依赖源码检出目录。已有证据需要显式配置路径，仍可使用 `doctor --evidence PATH`。修改现有集成前请阅读 [CRG-0103 路径、状态语义与迁移说明](docs/implementation/CRG-0103-RESULTS.md)。`doctor --probe` 会显式调用隔离运行时探测，不属于安装或普通查看操作。
-
-安装及对应卸载/回退步骤见[贡献者快速指南](docs/CONTRIBUTOR-QUICKSTART.md)。保留未确认的恢复日志；移除 skill 不等于卸载独立配置的 hooks。
-
-
-### M4 离线实验
-
-新增 `statistical-audit`、`resolve-model` 和供测试适配器使用的重置事务引擎，详见 [M4 契约说明](docs/metrics/EXPERIMENTAL-M4.md)。这些实现不会启用高级策略或实际兑换重置额度。[CRG-0301～0401 验收报告](docs/implementation/CRG-0301-0401-RESULTS.md) 区分了已通过的离线测试与尚缺的真实数据、运行时及 Windows/附件证据；整批任务尚未满足上线验收条件。
-
-执行与恢复提供本地去重、提交前持久化意图，以及接受状态不明时不盲目重发的保证，不承诺分布式恰好一次交付。归档策略、配置支持与恢复限制见[执行配置与信任语义](docs/architecture/execution-semantics.md)。
-
-## 复现离线演示（v0.1.0 已实现）
-
-在仓库目录使用 Python 3.11+：
-
-```sh
-python3 scripts/demo_offline.py
-```
-
-演示在独立临时工作目录中调用发布的 CLI，使用空 HOME/CODEX_HOME，PATH 中没有 Codex。
-它创建默认禁用的项目配置，读取配置和诊断结果，并确认 Hook 安装预览不写入 Hook 文件。
-不调用模型。预览中的 dispatcher 仅为占位示例，不安装或激活集成。
-最终 `result: PASS` 表示四项离线检查成功，不代表真实运行时兼容性。
-
-## 连续性策略与控制模式
-
-CRG 默认禁用。显式启用后，`native_cooperative` 允许原生连续执行并保存受支持的快照；
-`observe` 不执行 Hook 写入或拦截；`manual_recovery` 由用户决定交接；
-`guarded_owned_rollover` 需要明确授权且已验证的自有集成。
-原生压缩由运行时负责；CRG 保存恢复内容，并在操作是否已接受不明时核对证据，不盲目重发。
-
-MODE_A 是保守回退；MODE_B 需要已验证的无损 Stop 数据、可信 Hook 执行及提示词拦截；
-MODE_C 还要求拥有活动传输通道，并验证新任务、工作区、接受状态与归档行为。
-设置策略或模式并不能证明这些能力。当前没有通过拦截认证的公开 Hook 适配器。
-全局安装 skill 不等于全局安装 Hook。详见[策略说明](docs/architecture/native-cooperative.md)。
-
-私密恢复归档可能包含原始提示词和答案；文件权限不等于加密。公开夹具是合成数据，默认不上传任何内容。
-卸载时保留未确认的恢复日志；按[快速指南](docs/CONTRIBUTOR-QUICKSTART.md)只移除安装回执所拥有的 Hook 条目。
-
-当前[托管验收证据](docs/ci-acceptance.md)仅适用于离线测试。真实跨仓库 fork、原生能力激活及 Windows 支持仍未验证。
-可从[范围明确的贡献任务](docs/GOOD-FIRST-ISSUES.md)开始参与。
-
-### 规范化分析与本地预测
-
-[本地分析指南](docs/quickstart.md)提供有界规范化导入、自然周统计、预览确认后的数值导出与任务执行前的基线预测。没有已验证的官方适配器时，账户活动保持不支持；不会猜测原生会话日志结构。参见[离线证据](docs/evaluations/summary.md)、[预测限制](docs/evaluations/forecast-quality.md)和[隐私边界](docs/privacy.md)。[合成数据集](docs/data-card.md)不含贡献者日志。原生 Windows 仍不支持；重置适配器保持默认禁用、实验性质。
+本项目采用 [Apache License 2.0](LICENSE) 许可证。
