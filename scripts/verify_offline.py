@@ -17,7 +17,7 @@ if sys.version_info < (3, 11):
     raise SystemExit('Python >=3.11 is required')
 ROOT = Path(__file__).resolve().parents[1]
 PREFIXES = ('crg/', 'scripts/', 'tests/', 'skills/', '.github/workflows/')
-SINGLES = {'README.md', 'README.zh-CN.md', 'LICENSE', 'pyproject.toml', 'crg.toml', '.codex-plugin/plugin.json', '.gitignore'}
+SINGLES = {'README.md', 'README.zh-CN.md', 'LICENSE', 'pyproject.toml', 'crg.toml', '.codex-plugin/plugin.json', '.gitignore', 'benchmarks/datasets/synthetic-timing-v1.jsonl', 'schemas/export.schema.json'}
 
 
 def selected(name):

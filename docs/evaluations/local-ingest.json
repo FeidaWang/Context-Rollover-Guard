@@ -1,0 +1,23 @@
+{
+  "evidence": "synthetic_local",
+  "python": "3.13.14",
+  "os": "Darwin",
+  "architecture": "arm64",
+  "cpu_count": 14,
+  "reader_sha256": "1c7474eca88020ca4295ab191413f81b70267f529aba4091ca7ce1e1d4c69a3d",
+  "history_bytes": 104857600,
+  "storage": "local temporary sparse file",
+  "process_startup_ms": [
+    33.101542,
+    34.283083,
+    35.706292,
+    32.951041,
+    32.823292
+  ],
+  "cold_ms": 0.332084,
+  "cold_bytes": 256,
+  "hot_samples": 100,
+  "hot_p95_ms": 0.069209,
+  "hot_max_bytes": 256,
+  "limitations": "Warm cache, sparse history, no native runtime; not an end-to-end latency guarantee."
+}

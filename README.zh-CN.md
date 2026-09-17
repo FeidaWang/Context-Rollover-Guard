@@ -131,3 +131,7 @@ MODE_C 还要求拥有活动传输通道，并验证新任务、工作区、接�
 
 当前[托管验收证据](docs/ci-acceptance.md)仅适用于离线测试。真实跨仓库 fork、原生能力激活及 Windows 支持仍未验证。
 可从[范围明确的贡献任务](docs/GOOD-FIRST-ISSUES.md)开始参与。
+
+### 规范化分析与本地预测
+
+[本地分析指南](docs/quickstart.md)提供有界规范化导入、自然周统计、预览确认后的数值导出与任务执行前的基线预测。没有已验证的官方适配器时，账户活动保持不支持；不会猜测原生会话日志结构。参见[离线证据](docs/evaluations/summary.md)、[预测限制](docs/evaluations/forecast-quality.md)和[隐私边界](docs/privacy.md)。[合成数据集](docs/data-card.md)不含贡献者日志。原生 Windows 仍不支持；重置适配器保持默认禁用、实验性质。

@@ -84,6 +84,29 @@ def main(argv=None):
     installer.add_argument("--apply",action="store_true")
     uninstaller=sub.add_parser("uninstall-hooks",help="Remove only receipt-owned Hook entries")
     uninstaller.add_argument("--receipt",type=Path,required=True)
+    fn=sub.add_parser('forecast-next',help='Persist a confirmed task forecast before execution; no inference')
+    fn.add_argument('--database',type=Path,required=True);fn.add_argument('--intent',type=Path,required=True)
+    fn.add_argument('--policy',type=Path,required=True);fn.add_argument('--at',required=True)
+    fn.add_argument('--target',choices=['wall_ms','active_ms','total_tokens'],default='wall_ms')
+    fo=sub.add_parser('forecast-outcome',help='Record an externally observed target or correction')
+    fo.add_argument('--database',type=Path,required=True);fo.add_argument('--input',type=Path,required=True)
+    qc=sub.add_parser('task-capacity',help='Conditional comparable-task estimate from supplied bucket evidence')
+    qc.add_argument('--input',type=Path,required=True)
+    ni=sub.add_parser('analytics-import',help='Bounded import of explicitly authorized normalized v1 JSONL')
+    ni.add_argument('--database',type=Path,required=True);ni.add_argument('--input',type=Path,required=True)
+    ni.add_argument('--authorized-root',type=Path,required=True)
+    ni.add_argument('--session',required=True);ni.add_argument('--runtime-version',required=True)
+    ni.add_argument('--bootstrap-at-end',action='store_true')
+    panel=sub.add_parser('analytics-status',help='Content-free local status; account adapter may be unsupported')
+    panel.add_argument('--database',type=Path,required=True);panel.add_argument('--at',required=True)
+    panel.add_argument('--scope',choices=['local','account','unknown'],default='local')
+    panel.add_argument('--window',choices=['calendar_week','rolling_168h'],default='calendar_week')
+    panel.add_argument('--timezone',default='UTC');panel.add_argument('--format',choices=['json','human'],default='json')
+    ep=sub.add_parser('export-preview',help='Preview numeric-only analytics; no file write or upload')
+    ep.add_argument('--database',type=Path,required=True)
+    ew=sub.add_parser('export-write',help='Write the exact previously reviewed export; never upload')
+    ew.add_argument('--preview',type=Path,required=True);ew.add_argument('--output',type=Path,required=True)
+    ew.add_argument('--approved-sha256',required=True)
     ledger = sub.add_parser('ledger-import', help='Import projected JSONL counters into a private local ledger')
     ledger.add_argument('--database',type=Path,required=True)
     ledger.add_argument('--input',type=Path,required=True)
@@ -129,6 +152,51 @@ def main(argv=None):
     resolve.add_argument('--permission-profile')
     args = parser.parse_args(argv)
     try:
+        if args.command in {'forecast-next','forecast-outcome'}:
+            from .forecast import Forecasts
+            from .features import features
+            if args.command=='forecast-outcome' and not args.database.is_file():
+                raise ValueError('Existing pre-execution forecast required')
+            forecasts=Forecasts(args.database)
+            try:
+                if args.command=='forecast-next':
+                    snapshot=features(json.loads(args.intent.read_text()),json.loads(args.policy.read_text()),at=args.at)
+                    result=forecasts.predict(snapshot,target=args.target)
+                else:
+                    forecasts.complete(**json.loads(args.input.read_text()));result={'recorded':True,'model_calls':0}
+            finally:forecasts.close()
+            print(json.dumps(result,ensure_ascii=False,indent=2));return 0
+        if args.command=='task-capacity':
+            from .quota_forecast import capacity
+            print(json.dumps(capacity(**json.loads(args.input.read_text())),indent=2));return 0
+        if args.command in {'analytics-import','analytics-status','export-preview'}:
+            from .ledger import CanonicalLedger
+            if args.command != 'analytics-import' and not args.database.is_file():
+                raise ValueError('Existing analytics database required; unknown is not zero')
+            ledger=CanonicalLedger(args.database)
+            try:
+                if args.command=='analytics-import':
+                    from .native_reader import BoundReader
+                    result=BoundReader(ledger,args.input,authorized_root=args.authorized_root,
+                        session_id=args.session,runtime_version=args.runtime_version).read(bootstrap_at_end=args.bootstrap_at_end)
+                elif args.command=='analytics-status':
+                    from .account import interval
+                    from .presentation import status,human
+                    start,end=interval(args.window,at=args.at,timezone_name=args.timezone)
+                    result=status(ledger.usage(args.scope,start,end))
+                    if args.format=='human':
+                        print(human(result));return 0
+                else:
+                    from .export import preview
+                    rows=ledger.db.execute('SELECT payload FROM fact LIMIT 1001').fetchall()
+                    if len(rows)>1000:raise ValueError('Export exceeds bounded preview; narrow the dataset first')
+                    result=preview([json.loads(row[0]) for row in rows])
+            finally:ledger.close()
+            print(json.dumps(result,ensure_ascii=False,indent=2));return 0
+        if args.command=='export-write':
+            from .export import write_approved
+            result=write_approved(json.loads(args.preview.read_text()),args.output,approved_sha256=args.approved_sha256)
+            print(json.dumps(result));return 0
         if args.command == 'statistical-audit':
             from .statistical_audit import audit
             with args.input.open() as stream:

@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "evidence": "synthetic",
+  "selection": "rolling_median baseline; no complex estimator enabled",
+  "split": "strict prefix training, next task evaluation; projects reported separately",
+  "live_samples": 0,
+  "causal_model_comparison": false,
+  "projects": [
+    {
+      "project": "constant",
+      "tasks": 60,
+      "baselines": {
+        "constant": {
+          "sample_count": 55,
+          "effective_sample_size": 55,
+          "bias": 0,
+          "mae": 0,
+          "pinball_loss": 0.0,
+          "coverage": 1,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "last_value": {
+          "sample_count": 55,
+          "effective_sample_size": 55,
+          "bias": 0,
+          "mae": 0,
+          "pinball_loss": 0.0,
+          "coverage": 1,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "rolling_median": {
+          "sample_count": 55,
+          "effective_sample_size": 55,
+          "bias": 0.0,
+          "mae": 0.0,
+          "pinball_loss": 0.0,
+          "coverage": 1,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        }
+      }
+    },
+    {
+      "project": "tiny",
+      "tasks": 80,
+      "baselines": {
+        "constant": {
+          "sample_count": 75,
+          "effective_sample_size": 75,
+          "bias": -99.24,
+          "mae": 99.24,
+          "pinball_loss": 49.62,
+          "coverage": 0,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "last_value": {
+          "sample_count": 75,
+          "effective_sample_size": 75,
+          "bias": 0.02666666666666667,
+          "mae": 1.4933333333333334,
+          "pinball_loss": 0.7466666666666667,
+          "coverage": 0,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "rolling_median": {
+          "sample_count": 75,
+          "effective_sample_size": 75,
+          "bias": 0.31333333333333335,
+          "mae": 0.8066666666666666,
+          "pinball_loss": 0.10466666666666666,
+          "coverage": 0.9866666666666667,
+          "interval_width": 1.96,
+          "independence": "one latest outcome per task; project independence not assumed"
+        }
+      }
+    },
+    {
+      "project": "shift",
+      "tasks": 75,
+      "baselines": {
+        "constant": {
+          "sample_count": 70,
+          "effective_sample_size": 70,
+          "bias": 321.42857142857144,
+          "mae": 321.42857142857144,
+          "pinball_loss": 160.71428571428572,
+          "coverage": 0.6428571428571429,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "last_value": {
+          "sample_count": 70,
+          "effective_sample_size": 70,
+          "bias": 0,
+          "mae": 25.714285714285715,
+          "pinball_loss": 12.857142857142858,
+          "coverage": 0.9714285714285714,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "rolling_median": {
+          "sample_count": 70,
+          "effective_sample_size": 70,
+          "bias": 0.0,
+          "mae": 270.0,
+          "pinball_loss": 52.714285714285715,
+          "coverage": 0.9285714285714286,
+          "interval_width": 411.42857142857144,
+          "independence": "one latest outcome per task; project independence not assumed"
+        }
+      }
+    },
+    {
+      "project": "gradual",
+      "tasks": 79,
+      "baselines": {
+        "constant": {
+          "sample_count": 74,
+          "effective_sample_size": 74,
+          "bias": 325,
+          "mae": 327.7027027027027,
+          "pinball_loss": 163.85135135135135,
+          "coverage": 0.013513513513513514,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "last_value": {
+          "sample_count": 74,
+          "effective_sample_size": 74,
+          "bias": 10,
+          "mae": 10,
+          "pinball_loss": 5.0,
+          "coverage": 0,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "rolling_median": {
+          "sample_count": 74,
+          "effective_sample_size": 74,
+          "bias": 96.89189189189189,
+          "mae": 96.89189189189189,
+          "pinball_loss": 21.804054054054053,
+          "coverage": 0,
+          "interval_width": 145.54054054054055,
+          "independence": "one latest outcome per task; project independence not assumed"
+        }
+      }
+    },
+    {
+      "project": "heavy_tail",
+      "tasks": 62,
+      "baselines": {
+        "constant": {
+          "sample_count": 57,
+          "effective_sample_size": 57,
+          "bias": 1926.3157894736842,
+          "mae": 1926.3157894736842,
+          "pinball_loss": 963.1578947368421,
+          "coverage": 0.9649122807017544,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "last_value": {
+          "sample_count": 57,
+          "effective_sample_size": 57,
+          "bias": 0,
+          "mae": 3852.6315789473683,
+          "pinball_loss": 1926.3157894736842,
+          "coverage": 0.9298245614035088,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        },
+        "rolling_median": {
+          "sample_count": 57,
+          "effective_sample_size": 57,
+          "bias": 1926.3157894736842,
+          "mae": 1926.3157894736842,
+          "pinball_loss": 963.1578947368421,
+          "coverage": 0.9649122807017544,
+          "interval_width": 0,
+          "independence": "one latest outcome per task; project independence not assumed"
+        }
+      }
+    }
+  ]
+}

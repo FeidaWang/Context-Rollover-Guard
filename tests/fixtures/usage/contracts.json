@@ -1,0 +1,189 @@
+{
+  "synthetic": true,
+  "cases": [
+    {
+      "schema_version": 1,
+      "kind": "usage",
+      "observation_id": "1",
+      "fact_id": "1",
+      "revision": 0,
+      "source": "fixture",
+      "adapter_version": "1",
+      "scope": "local",
+      "account_id": "a",
+      "workspace_id": "w",
+      "thread_id": "t",
+      "quality": "synthetic",
+      "observed_at": "2026-09-17T00:00:01Z",
+      "received_at": "2026-09-18T00:00:00Z",
+      "data": {
+        "total_tokens": null,
+        "semantics": "cumulative_snapshot",
+        "generation": "g",
+        "aggregation": "exclusive",
+        "subset_contract": "unknown"
+      }
+    },
+    {
+      "schema_version": 1,
+      "kind": "usage",
+      "observation_id": "2",
+      "fact_id": "2",
+      "revision": 0,
+      "source": "fixture",
+      "adapter_version": "1",
+      "scope": "local",
+      "account_id": "a",
+      "workspace_id": "w",
+      "thread_id": "t",
+      "quality": "synthetic",
+      "observed_at": "2026-09-17T00:00:02Z",
+      "received_at": "2026-09-18T00:00:00Z",
+      "data": {
+        "total_tokens": 0,
+        "semantics": "cumulative_snapshot",
+        "generation": "g",
+        "aggregation": "exclusive",
+        "subset_contract": "unknown"
+      }
+    },
+    {
+      "schema_version": 1,
+      "kind": "usage",
+      "observation_id": "3",
+      "fact_id": "3",
+      "revision": 0,
+      "source": "fixture",
+      "adapter_version": "1",
+      "scope": "local",
+      "account_id": "a",
+      "workspace_id": "w",
+      "thread_id": "t",
+      "quality": "synthetic",
+      "observed_at": "2026-09-17T00:00:03Z",
+      "received_at": "2026-09-18T00:00:00Z",
+      "data": {
+        "total_tokens": -1,
+        "semantics": "cumulative_snapshot",
+        "generation": "g",
+        "aggregation": "exclusive",
+        "subset_contract": "unknown"
+      }
+    },
+    {
+      "schema_version": 1,
+      "kind": "usage",
+      "observation_id": "4",
+      "fact_id": "4",
+      "revision": 0,
+      "source": "fixture",
+      "adapter_version": "1",
+      "scope": "local",
+      "account_id": "a",
+      "workspace_id": "w",
+      "thread_id": "t",
+      "quality": "synthetic",
+      "observed_at": "2026-09-17T00:00:04Z",
+      "received_at": "2026-09-18T00:00:00Z",
+      "data": {
+        "total_tokens": true,
+        "semantics": "cumulative_snapshot",
+        "generation": "g",
+        "aggregation": "exclusive",
+        "subset_contract": "unknown"
+      }
+    },
+    {
+      "schema_version": 1,
+      "kind": "usage",
+      "observation_id": "5",
+      "fact_id": "5",
+      "revision": 0,
+      "source": "fixture",
+      "adapter_version": "1",
+      "scope": "local",
+      "account_id": "a",
+      "workspace_id": "w",
+      "thread_id": "t",
+      "quality": "synthetic",
+      "observed_at": "2026-09-17T00:00:05Z",
+      "received_at": "2026-09-18T00:00:00Z",
+      "data": {
+        "total_tokens": 130,
+        "semantics": "cumulative_snapshot",
+        "generation": "g",
+        "aggregation": "exclusive",
+        "subset_contract": "unknown"
+      }
+    },
+    {
+      "schema_version": 1,
+      "kind": "usage",
+      "observation_id": "5",
+      "fact_id": "5",
+      "revision": 0,
+      "source": "fixture",
+      "adapter_version": "1",
+      "scope": "local",
+      "account_id": "a",
+      "workspace_id": "w",
+      "thread_id": "t",
+      "quality": "synthetic",
+      "observed_at": "2026-09-17T00:00:05Z",
+      "received_at": "2026-09-18T00:00:00Z",
+      "data": {
+        "total_tokens": 130,
+        "semantics": "cumulative_snapshot",
+        "generation": "g",
+        "aggregation": "exclusive",
+        "subset_contract": "unknown"
+      }
+    },
+    {
+      "schema_version": 1,
+      "kind": "usage",
+      "observation_id": "5",
+      "fact_id": "5",
+      "revision": 1,
+      "source": "fixture",
+      "adapter_version": "1",
+      "scope": "local",
+      "account_id": "a",
+      "workspace_id": "w",
+      "thread_id": "t",
+      "quality": "synthetic",
+      "observed_at": "2026-09-17T00:00:05Z",
+      "received_at": "2026-09-18T00:00:00Z",
+      "data": {
+        "total_tokens": 120,
+        "semantics": "cumulative_snapshot",
+        "generation": "g",
+        "aggregation": "exclusive",
+        "subset_contract": "unknown"
+      }
+    },
+    {
+      "schema_version": 1,
+      "kind": "usage",
+      "observation_id": "6",
+      "fact_id": "6",
+      "revision": 0,
+      "source": "fixture",
+      "adapter_version": "1",
+      "scope": "local",
+      "account_id": "a",
+      "workspace_id": "w",
+      "thread_id": "t",
+      "quality": "synthetic",
+      "observed_at": "2026-09-17T00:00:06Z",
+      "received_at": "2026-09-18T00:00:00Z",
+      "data": {
+        "total_tokens": 100,
+        "semantics": "cumulative_snapshot",
+        "generation": "g",
+        "aggregation": "exclusive",
+        "subset_contract": "unknown"
+      }
+    }
+  ]
+}

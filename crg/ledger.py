@@ -100,3 +100,131 @@ class Ledger:
                 'known_total_tokens':sum(known) if known else None,'sample_count':len(rows),
                 'known_samples':len(known),'unknown_samples':len(rows)-len(known),
                 'coverage':'partial' if len(known)!=len(rows) or not rows else 'recorded_events_only'}
+
+
+class CanonicalLedger:
+    """Additive v1 normalized store. Legacy tables remain readable and unchanged.
+
+    Immutable observations and latest logical facts have separate identities.
+    Cursor compare-and-swap and observations share one durable transaction.
+    """
+    def __init__(self, path):
+        self.db = connect(path)
+        with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            self.db.execute('CREATE TABLE IF NOT EXISTS analytics_schema(version INTEGER PRIMARY KEY)')
+            versions = [r[0] for r in self.db.execute('SELECT version FROM analytics_schema')]
+            if versions and versions != [1]:
+                self.db.close()
+                raise ValueError('Unsupported analytics migration')
+            self.db.execute('INSERT OR IGNORE INTO analytics_schema VALUES(1)')
+            self.db.execute('CREATE TABLE IF NOT EXISTS observation(id TEXT PRIMARY KEY, fact TEXT NOT NULL, revision INTEGER NOT NULL, hash TEXT NOT NULL, payload TEXT NOT NULL)')
+            self.db.execute('CREATE TABLE IF NOT EXISTS fact(id TEXT PRIMARY KEY, revision INTEGER NOT NULL, hash TEXT NOT NULL, payload TEXT NOT NULL, series TEXT NOT NULL, at TEXT NOT NULL, scope TEXT NOT NULL, semantics TEXT NOT NULL, raw_total INTEGER, delta INTEGER, reason TEXT NOT NULL)')
+            self.db.execute('CREATE INDEX IF NOT EXISTS fact_series ON fact(series,at,id)')
+            self.db.execute('CREATE INDEX IF NOT EXISTS fact_scope_time ON fact(scope,at)')
+            self.db.execute('CREATE TABLE IF NOT EXISTS import_cursor(source TEXT PRIMARY KEY,payload TEXT NOT NULL)')
+
+    def close(self):
+        self.db.close()
+
+    def cursor(self, source):
+        row = self.db.execute('SELECT payload FROM import_cursor WHERE source=?', (source,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def ingest(self, observations, *, source=None, expected_cursor=None, cursor=None, fault=None):
+        from .events import Observation
+        rows = [Observation(o.to_dict()) if isinstance(o, Observation) else Observation(o) for o in observations]
+        if len(rows) > 1000:
+            raise ValueError('Batch exceeds 1000 observations')
+        if (source is None) != (cursor is None):
+            raise ValueError('Cursor source and payload required together')
+        with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            if source is not None and self.cursor(source) != expected_cursor:
+                raise ValueError('Cursor changed; reread before importing')
+            for observation in rows:
+                self._add(observation)
+            if fault:
+                fault('after_observations')
+            if source is not None:
+                self.db.execute('INSERT INTO import_cursor VALUES(?,?) ON CONFLICT(source) DO UPDATE SET payload=excluded.payload',
+                                (source, json.dumps(cursor, sort_keys=True, allow_nan=False)))
+            if fault:
+                fault('before_commit')
+        if fault:
+            fault('after_commit')
+
+    def _add(self, observation):
+        row = observation.to_dict()
+        scope = [row.get(k) for k in ('source', 'adapter_version', 'scope', 'account_id', 'workspace_id', 'thread_id', 'kind')]
+        obs_id = identity([scope, row['observation_id'], row['revision']])
+        fact_id = identity([scope, row['fact_id']])
+        # Receipt time is transport metadata, not a new source revision.
+        content = {k: v for k, v in row.items() if k not in {'received_at', 'observation_id'}}
+        digest = identity(content)
+        old = self.db.execute('SELECT hash FROM observation WHERE id=?', (obs_id,)).fetchone()
+        if old:
+            if old[0] != digest:
+                raise ValueError('Conflicting source observation revision')
+            return
+        prior = self.db.execute('SELECT * FROM fact WHERE id=?', (fact_id,)).fetchone()
+        if prior and prior['revision'] == row['revision'] and prior['hash'] != digest:
+            raise ValueError('Conflicting logical fact revision')
+        encoded = json.dumps(row, sort_keys=True, allow_nan=False)
+        self.db.execute('INSERT INTO observation VALUES(?,?,?,?,?)', (obs_id, fact_id, row['revision'], digest, encoded))
+        if prior and prior['revision'] >= row['revision']:
+            return
+        data = row['data']
+        semantics = data.get('semantics', row['kind'])
+        series = identity([scope, semantics, data.get('generation')])
+        if prior and (prior['series'] != series or prior['at'] != row['observed_at']):
+            raise ValueError('Revision cannot move a fact between series or times')
+        raw = observation.exact_usage() if row['kind'] == 'usage' else None
+        self.db.execute('INSERT INTO fact VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,hash=excluded.hash,payload=excluded.payload,raw_total=excluded.raw_total',
+                        (fact_id, row['revision'], digest, encoded, series, row['observed_at'], row['scope'], semantics, raw, None, 'UNKNOWN'))
+        self._derive(fact_id)
+        following = self.db.execute('SELECT id FROM fact WHERE series=? AND (at,id)>(?,?) ORDER BY at,id LIMIT 1',
+                                    (series, row['observed_at'], fact_id)).fetchone()
+        if following:
+            self._derive(following[0])
+
+    def _derive(self, fact_id):
+        row = self.db.execute('SELECT * FROM fact WHERE id=?', (fact_id,)).fetchone()
+        delta, reason = row['raw_total'], 'REQUEST_INCREMENT'
+        if row['semantics'] not in {'request_increment', 'cumulative_snapshot'}:
+            delta, reason = None, 'SEPARATE_SEMANTIC_OBJECT'
+        elif row['semantics'] == 'cumulative_snapshot':
+            previous = self.db.execute('SELECT * FROM fact WHERE series=? AND (at,id)<(?,?) ORDER BY at DESC,id DESC LIMIT 1',
+                                       (row['series'], row['at'], row['id'])).fetchone()
+            data = json.loads(row['payload'])['data']
+            origin = data.get('zero_origin_at')
+            if not previous:
+                delta, reason = None, 'LEFT_CENSORED_BASELINE'
+                if origin == row['at'] and row['raw_total'] == 0:
+                    delta, reason = 0, 'VERIFIED_ZERO_ORIGIN'
+            elif previous['at'] == row['at']:
+                delta, reason = None, 'AMBIGUOUS_SAME_TIME'
+            elif row['raw_total'] is None or previous['raw_total'] is None:
+                delta, reason = None, 'UNKNOWN_COUNTER'
+            elif row['raw_total'] < previous['raw_total']:
+                delta, reason = None, 'COUNTER_CORRECTION'
+            else:
+                delta, reason = row['raw_total'] - previous['raw_total'], 'OBSERVED_DELTA'
+        if delta is None and reason == 'REQUEST_INCREMENT':
+            reason = 'UNKNOWN_SCOPE_OR_AGGREGATION'
+        self.db.execute('UPDATE fact SET delta=?,reason=? WHERE id=?', (delta, reason, fact_id))
+
+    def usage(self, scope, start, end):
+        from .events import instant
+        start, end = instant(start), instant(end)
+        if start >= end or scope not in {'local', 'account', 'unknown'}:
+            raise ValueError('Explicit scope and valid half-open interval required')
+        rows = self.db.execute('SELECT delta,reason FROM fact WHERE scope=? AND at>=? AND at<? AND semantics IN ("request_increment","cumulative_snapshot","unknown")', (scope, start, end)).fetchall()
+        known = [r['delta'] for r in rows if r['delta'] is not None]
+        return {'schema_version': 1, 'scope': scope, 'start': start, 'end': end,
+                'known_total_tokens': sum(known) if known else None,
+                'sample_count': len(rows), 'known_samples': len(known),
+                'unknown_samples': len(rows) - len(known),
+                'reasons': sorted({r['reason'] for r in rows}),
+                'coverage': 'recorded_events_only', 'exact_account_total': None,
+                'model_calls': 0}

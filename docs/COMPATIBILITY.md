@@ -30,3 +30,15 @@ nested sandbox denial is retained as historical evidence; the approved local
 process-level sandbox now succeeds without changing global policy.
 Native Windows is unsupported/unverified. No new live compatibility badge or
 native runtime support is inferred from package or workflow tests.
+
+## Normalized analytics batch
+
+Normalized v1 imports, local status, numeric exports and empirical forecasts have
+separate offline contracts; see [the implementation guide](quickstart.md) and
+[evidence summary](evaluations/summary.md). The account activity adapter is
+UNSUPPORTED, and the native reader defaults to normalized records with a supplied
+adapter boundary. No undocumented native transcript or future model contract is
+inferred. The true fork-PR acceptance case was explicitly waived by the maintainer;
+it remains NOT_RUN. Native Windows expansion remains incomplete/unsupported under
+[its platform contract](architecture/platform-contract.md). Synthetic timing data
+is not a real-user calibration or adoption dataset.

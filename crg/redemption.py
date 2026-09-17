@@ -81,7 +81,7 @@ class Redemptions:
         intent = self.get(intent_id)
         if (not isinstance(receipt, dict) or receipt.get('intent_id') != intent_id
                 or receipt.get('account_fingerprint') != intent['payload']['account_fingerprint']
-                or receipt.get('status') not in {'accepted', 'no_credit', 'ineligible'}):
+                or receipt.get('status') not in {'accepted', 'already_redeemed', 'no_credit', 'nothing_to_reset', 'ineligible'}):
             raise ValueError('Ambiguous or mismatched receipt; reconcile without resubmitting')
         projected = {key: receipt[key] for key in ('intent_id', 'account_fingerprint', 'status')}
         encoded = json.dumps(projected, sort_keys=True)
@@ -92,7 +92,13 @@ class Redemptions:
                 raise ValueError('Conflicting reset receipt')
             if old['state'] == 'SUBMITTING':
                 self.db.execute('UPDATE reset_intent SET receipt=?,state=? WHERE intent_id=?',
-                    (encoded, 'ACCEPTED' if projected['status'] == 'accepted' else 'DECLINED', intent_id))
+                    (encoded, 'ACCEPTED' if projected['status'] in {'accepted','already_redeemed'} else 'DECLINED', intent_id))
+
+    def cancel(self, intent_id):
+        """Cancel only before dispatch; uncertainty must remain reconcilable."""
+        with self.db:
+            self.db.execute('UPDATE reset_intent SET state="CANCELLED" WHERE intent_id=? AND state="PREPARED"', (intent_id,))
+        return self.get(intent_id)
 
     def reconcile(self, intent_id, *, adapter):
         intent = self.get(intent_id)
@@ -112,7 +118,8 @@ class Redemptions:
                     or snapshot.get('redeemed_intent_id') != intent_id):
                 return intent
             # Store only a confirmation marker; raw account data is never persisted.
-            readback = json.dumps({'intent_id': intent_id, 'confirmed': True})
+            readback = json.dumps({'intent_id': intent_id, 'confirmed': True,
+                                   'changed_buckets': None, 'all_windows_reset': None})
             with self.db:
                 self.db.execute('UPDATE reset_intent SET readback=?,state="VERIFIED" WHERE intent_id=? AND state="ACCEPTED"',
                                 (readback, intent_id))

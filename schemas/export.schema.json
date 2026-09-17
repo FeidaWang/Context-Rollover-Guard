@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CRG numeric interchange v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "bundle_id", "record_id", "cluster_id", "scope", "kind", "quality", "token_unit", "time_unit", "quota_unit"],
+  "properties": {
+    "export_version": {"const": 1},
+    "bundle_id": {"type": "string", "pattern": "^[0-9a-f]{24}$"},
+    "record_id": {"type": "string", "pattern": "^[0-9a-f]{24}$"},
+    "cluster_id": {"type": "string", "pattern": "^[0-9a-f]{24}$"},
+    "scope": {"enum": ["local", "account", "unknown"]},
+    "kind": {"enum": ["context", "usage", "quota", "timing", "outcome", "prediction", "cost"]},
+    "quality": {"enum": ["verified", "synthetic", "unverified"]},
+    "token_unit": {"const": "tokens"},
+    "time_unit": {"const": "milliseconds"},
+    "quota_unit": {"const": "percentage_points"},
+    "input_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "output_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "cached_input_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "reasoning_output_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "total_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "wall_ms": {"type": ["integer", "null"], "minimum": 0},
+    "active_ms": {"type": ["integer", "null"], "minimum": 0},
+    "acceptance_ms": {"type": ["integer", "null"], "minimum": 0},
+    "used_percent": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+    "sequence_index": {"type": "integer", "minimum": 0}
+  }
+}

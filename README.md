@@ -146,3 +146,13 @@ entries as described in the [quickstart](docs/CONTRIBUTOR-QUICKSTART.md).
 Current [hosted acceptance evidence](docs/ci-acceptance.md) is scoped to offline tests.
 Cross-repository fork evidence, live/native activation and Windows support remain
 unverified. See [contribution tasks](docs/GOOD-FIRST-ISSUES.md) for bounded work.
+
+### Normalized analytics and local forecasts
+
+The [local analytics guide](docs/quickstart.md) covers bounded normalized imports,
+calendar-week status, preview-approved numeric exports and pre-execution baseline
+forecasts. Account activity remains unsupported without a verified official adapter;
+raw native transcript schemas are not inferred. See [offline evidence](docs/evaluations/summary.md),
+[forecast limitations](docs/evaluations/forecast-quality.md) and [privacy](docs/privacy.md).
+The [synthetic dataset](docs/data-card.md) contains no contributor logs. Native Windows
+remains unsupported; reset adapters remain disabled by default and experimental.

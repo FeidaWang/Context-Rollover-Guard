@@ -146,6 +146,30 @@
         "tests/unit/test_foundation.py",
         "crg/capability_probe.py"
       ]
+    },
+    {
+      "path": "usage/contracts.json",
+      "sha256": "98b7b7e22c8d52784eec28759c5b19d749781525fa2c5048470b59a3c11b605d",
+      "size_bytes": 4912,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_events.py"
+      ]
+    },
+    {
+      "path": "account/unavailable.json",
+      "sha256": "afe3f713efd775bd73ca3623bdfb074b227190ea2ec8a917619789ea2feb2793",
+      "size_bytes": 72,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_account_usage.py"
+      ]
     }
   ]
 }

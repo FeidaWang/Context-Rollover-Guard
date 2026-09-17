@@ -69,3 +69,53 @@ def recommend(catalog,features,policy,history=None,*,at=None):
                     cost_source='operator-supplied ordinal policy; not measured monetary cost',catalog_age_seconds=age)
     except (ValueError,TypeError,KeyError,AttributeError,OverflowError):
         return dict(result,reason='INVALID_OR_INCOMPLETE_ADVICE_INPUT')
+
+
+def recommend_verified(catalog, features, policy, requirements, history=None, *, at=None):
+    """Stricter opt-in advice contract. Missing capability evidence fails closed.
+
+    A host must still resolve the selected execution against the current runtime.
+    Observational histories do not establish causal model superiority.
+    """
+    required={'modalities','tools','permission_profile','context_tokens','risk'}
+    if (not isinstance(requirements,dict) or set(requirements)!=required
+            or not isinstance(requirements['modalities'],list) or not isinstance(requirements['tools'],list)
+            or not all(isinstance(v,str) for v in requirements['modalities']+requirements['tools'])
+            or type(requirements['context_tokens']) is not int or requirements['context_tokens']<0
+            or requirements['risk'] not in {'low','medium','high'}):
+        return {'selected':None,'reason':'UNKNOWN_REQUIREMENTS','additional_model_calls':0,'automatic_switch':False}
+    filtered=[]
+    for model in catalog.get('models',[]):
+        capability=model.get('capabilities',{})
+        if (capability.get('verified') is not True
+                or not set(requirements['modalities'])<=set(capability.get('modalities',[]))
+                or not set(requirements['tools'])<=set(capability.get('tools',[]))
+                or requirements['permission_profile'] not in capability.get('permission_profiles',[])
+                or type(capability.get('context_tokens')) is not int
+                or capability['context_tokens']<requirements['context_tokens']
+                or requirements['risk'] not in capability.get('approved_risks',[])):
+            continue
+        filtered.append(model)
+    result=recommend(dict(catalog,models=filtered),features,policy,history,at=at)
+    result.update(evidence='observational or operator heuristic; not a causal ranking',
+                  required_capabilities=requirements)
+    return result
+
+
+def accepted_workflow_cost(workflows):
+    """All attempts including failures/repairs; distinct units, no scalar score."""
+    from .events import number
+    seen=set();rows=[]
+    for row in workflows:
+        if row.get('quality_source') not in {'maintainer','executed_tests'} or type(row.get('accepted')) is not bool:
+            return {'status':'UNKNOWN_QUALITY','cost_per_accepted_task':None}
+        if not isinstance(row.get('task_id'),str) or row['task_id'] in seen:
+            raise ValueError('One complete workflow per independent task required')
+        seen.add(row['task_id']);rows.append(row)
+    accepted=sum(row['accepted'] for row in rows)
+    costs={}
+    for unit in ('tokens','wall_ms','quota_percent','money'):
+        values=[number(row.get(unit)) for row in rows]
+        costs[unit]=sum(values)/accepted if accepted and all(v is not None for v in values) else None
+    return {'status':'OBSERVATIONAL','accepted_tasks':accepted,'attempted_tasks':len(rows),
+            'cost_per_accepted_task':costs,'causal_ranking':False}

@@ -4,7 +4,8 @@ import math
 from .ledger import connect,identity,timestamp,nonnegative
 
 FIELDS=('observed_at','source','account_fingerprint','bucket_id','used_percent','remaining_percent',
-        'reset_at','window_seconds','raw_limit_units','unit_name','freshness_seconds')
+        'reset_at','window_seconds','raw_limit_units','unit_name','freshness_seconds',
+        'workspace_id','limit_id','policy_epoch')
 
 
 class Quotas:
@@ -34,7 +35,8 @@ class Quotas:
         if 'user_confirmed_reset' in row and type(row['user_confirmed_reset']) is not bool:raise ValueError('Explicit reset confirmation must be boolean')
         reset=row.get('authoritative_reset_id')
         if reset is not None and (not isinstance(reset,str) or not reset):raise ValueError('Invalid authoritative reset identity')
-        account=row['account_fingerprint'];bucket=row['bucket_id'];observed=row['observed_at']
+        account=self.partition(row['account_fingerprint'], row.get('workspace_id'), row.get('limit_id'), row.get('policy_epoch'))
+        bucket=row['bucket_id'];observed=row['observed_at']
         ident=identity([row['source'],account,bucket,row['source_snapshot_id']]);payload_hash=identity(row)
         with self.db:
             self.db.execute('BEGIN IMMEDIATE')
@@ -47,6 +49,11 @@ class Quotas:
             epoch=previous['epoch_id'] if previous else None
             old=json.loads(previous['payload']) if previous else {}
             reason='INITIAL_OBSERVATION' if not previous else None;confidence='OBSERVED'
+            row['transition']='OBSERVED'
+            if previous and row.get('used_percent') is not None and old.get('used_percent') is not None and row['used_percent'] < old['used_percent']:
+                row['transition']='UNATTRIBUTED_ADJUSTMENT'
+            if previous and old.get('reset_at') and old['reset_at'] <= observed:
+                row['transition']='BOUNDARY_PENDING'
             if reset:
                 reason='AUTHORITATIVE_RESET';confidence='SOURCE_CONFIRMED'
             elif (previous and old.get('reset_at') and old['observed_at']<old['reset_at']<=observed
@@ -56,6 +63,7 @@ class Quotas:
             elif row.get('user_confirmed_reset') is True:
                 reason='USER_DECLARED_RESET';confidence='USER_CONFIRMED'
             if reason:
+                row['transition']='CONFIRMED_NEW_EPOCH' if reason=='AUTHORITATIVE_RESET' else reason
                 new=identity([account,bucket,'reset',reset]) if reset else identity([ident,reason])
                 found=self.db.execute('SELECT epoch_id FROM quota_epoch WHERE epoch_id=?',(new,)).fetchone()
                 if not found:self.db.execute('INSERT INTO quota_epoch VALUES(?,?,?,?,?,?,?)',(new,account,bucket,observed,reason,epoch,confidence))
@@ -63,7 +71,14 @@ class Quotas:
                 epoch=new
             self.db.execute('INSERT INTO quota_snapshot VALUES(?,?,?,?,?,?,?)',(ident,payload_hash,account,bucket,observed,json.dumps(row,sort_keys=True),epoch))
         return epoch
-    def latest(self,account,bucket,*,at):
+    @staticmethod
+    def partition(account,workspace=None,limit=None,policy=None):
+        for value in (workspace,limit,policy):
+            if value is not None and (not isinstance(value,str) or not value):raise ValueError('Invalid quota scope')
+        return account if all(v is None for v in (workspace,limit,policy)) else identity([account,workspace,limit,policy])
+
+    def latest(self,account,bucket,*,at,workspace_id=None,limit_id=None,policy_epoch=None):
+        account=self.partition(account,workspace_id,limit_id,policy_epoch)
         at=timestamp(at)
         found=self.db.execute('SELECT * FROM quota_snapshot WHERE account_key=? AND bucket_id=? AND observed_at<=? ORDER BY observed_at DESC LIMIT 1',(account,bucket,at)).fetchone()
         if not found:return {'status':'UNKNOWN','sample_count':0,'bucket_id':bucket,'remaining_percent':None}
@@ -78,4 +93,7 @@ class Quotas:
                 'remaining_percent':None if stale else row.get('remaining_percent'),
                 'last_observed_remaining_percent':row.get('remaining_percent'),
                 'tokens_remaining':None,'reset_at':row.get('reset_at'),
+                'transition':row.get('transition','OBSERVED'),
+                'policy_epoch':row.get('policy_epoch'),'limit_id':row.get('limit_id'),
+                'earned_reset_inventory':{'status':'UNSUPPORTED','available_count':None,'details':None},
                 'reset_semantics':'epochs preserve historical consumption; percentages are not token balances'}
