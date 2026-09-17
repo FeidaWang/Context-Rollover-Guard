@@ -65,9 +65,14 @@ turning off subprocess's posix_spawn optimization in the test-only guard;
 direct os.posix_spawn stays forbidden. This uses an internal CPython switch,
 so future interpreter upgrades must rerun the guard regression.
 
-Current-snapshot hosted Linux/macOS matrix verification is pending on an authorized
-test branch. The duplicate legacy offline.yml workflow was removed: ci.yml is
-the single default offline workflow and requires OS-level network denial.
-A real fork PR remains NOT_RUN: the supplied repository is the upstream and
-no existing fork or organization was visible to the authenticated owner.
-No hosted fork-PR acceptance is inferred from same-repository or local results.
+Current-snapshot hosted Linux/macOS matrix verification passed on commit
+`272a2c6c140b03bd222c8716d8b4a4db7f4fb84d`: both push and same-repository PR
+runs passed all six jobs. See [acceptance evidence](ci-acceptance.md) for immutable
+run links, interpreter versions and counts. The duplicate legacy offline.yml was
+removed; ci.yml is the single default offline workflow and requires OS network denial.
+Linux probes query socket.if_nameindex() and /proc/thread-self/net/route rather
+than relying on inherited sysfs mounts. Empty route files and header-only tables
+are accepted only alongside loopback-only interfaces and an actively denied connection.
+A real fork PR remains NOT_RUN: the supplied repository is upstream and no fork
+or organization was visible to its authenticated owner. Same-repository PR success
+does not complete the cross-repository acceptance case.
