@@ -46,7 +46,8 @@ def assert_os_network(env, cwd):
     code = '''import errno, socket, sys
 from pathlib import Path
 if sys.platform.startswith('linux'):
-    if sorted(p.name for p in Path('/sys/class/net').iterdir()) != ['lo']:
+    # Query the current network namespace, not an inherited sysfs mount.
+    if sorted(name for _, name in socket.if_nameindex()) != ['lo']:
         raise RuntimeError('Expected isolated namespace with loopback only')
     if len(Path('/proc/net/route').read_text().splitlines()) != 1:
         raise RuntimeError('Unexpected route in isolated namespace')

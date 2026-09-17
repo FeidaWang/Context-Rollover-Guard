@@ -34,3 +34,30 @@ class OfflineRunnerTests(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError): runner.assert_os_network({},ROOT)
             self.assertIn('-I',run.call_args.args[0])
             self.assertTrue(run.call_args.kwargs['check'])
+
+    def test_linux_probe_uses_current_interfaces_and_still_fails_closed(self):
+        import errno
+        with patch.object(runner.subprocess, 'run') as run:
+            runner.assert_os_network({}, ROOT)
+        code = run.call_args.args[0][-1]
+        cases = (
+            ([(1, 'lo')], 'header\n', OSError(errno.ENETUNREACH, 'isolated'), None),
+            ([(1, 'lo'), (2, 'eth0')], 'header\n', None, RuntimeError),
+            ([(1, 'lo')], 'header\nroute\n', None, RuntimeError),
+            ([(1, 'lo')], 'header\n', None, RuntimeError),
+            ([(1, 'lo')], 'header\n', OSError(errno.ECONNREFUSED, 'reachable'), OSError),
+        )
+        for interfaces, routes, error, expected in cases:
+            with self.subTest(interfaces=interfaces, routes=routes, error=error), \
+                 patch('sys.platform', 'linux'), \
+                 patch('socket.if_nameindex', return_value=interfaces), \
+                 patch('pathlib.Path.iterdir', side_effect=AssertionError('stale sysfs')), \
+                 patch('pathlib.Path.read_text', return_value=routes), \
+                 patch('socket.socket') as socket:
+                socket.return_value.connect.side_effect = error
+                if expected:
+                    with self.assertRaises(expected):
+                        exec(code, {})
+                else:
+                    exec(code, {})
+                    socket.return_value.connect.assert_called_once_with(('192.0.2.1', 9))
