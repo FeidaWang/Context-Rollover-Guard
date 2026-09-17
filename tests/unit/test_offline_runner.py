@@ -41,6 +41,8 @@ class OfflineRunnerTests(unittest.TestCase):
             runner.assert_os_network({}, ROOT)
         code = run.call_args.args[0][-1]
         cases = (
+            ([(1, 'lo')], '', OSError(errno.ENETUNREACH, 'isolated'), None),
+            ([(1, 'lo')], 'unexpected\n', OSError(errno.ENETUNREACH, 'isolated'), RuntimeError),
             ([(1, 'lo')], 'Iface\tDestination\n', OSError(errno.ENETUNREACH, 'isolated'), None),
             ([(1, 'lo')], 'Iface\tDestination\n   \n', OSError(errno.ENETUNREACH, 'isolated'), None),
             ([(1, 'lo'), (2, 'eth0')], 'Iface\n', None, RuntimeError),

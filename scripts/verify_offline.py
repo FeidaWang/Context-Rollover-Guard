@@ -50,7 +50,8 @@ if sys.platform.startswith('linux'):
     if sorted(name for _, name in socket.if_nameindex()) != ['lo']:
         raise RuntimeError('Expected isolated namespace with loopback only')
     routes = [line for line in Path('/proc/thread-self/net/route').read_text().splitlines() if line.strip()]
-    if len(routes) != 1 or not routes[0].startswith('Iface'):
+    # A namespace without an IPv4 FIB can expose a completely empty file.
+    if routes and (len(routes) != 1 or not routes[0].startswith('Iface')):
         raise RuntimeError('Unexpected route in isolated namespace: ' + repr(routes))
 s = socket.socket()
 s.settimeout(1)
