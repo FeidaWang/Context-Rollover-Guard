@@ -8,6 +8,7 @@ from .durable import immutable_write,read_private
 from .predictor import resolve_limit,predict
 from .state_store import canonical,StoreError
 import json
+from .hook_failure import failure_output
 
 
 class HookError(ValueError):
@@ -45,7 +46,21 @@ class HookDispatcher:
         self.configured_limit,self.scope=configured_limit,scope
 
     def dispatch(self,event):
+        try:return self._dispatch(event)
+        except (OSError,ValueError,StoreError) as exc:
+            guarded=(self.config.context_rollover.enabled
+                     and self.config.continuity.policy=='guarded_owned_rollover')
+            name=event.get('hook_event_name') if isinstance(event,dict) else None
+            if name=='UserPromptSubmit' and guarded and self.allow_prompt_block:
+                return failure_output(event,exc,prompt_block=True)[0]
+            if name=='PreCompact' and guarded and self.allow_precompact_block and self.config.emergency.block_auto_compact:
+                return failure_output(event,exc,precompact_block=True)[0]
+            # Preserve direct API error signaling on Stop and unverified adapters.
+            raise
+
+    def _dispatch(self,event):
         if not self.config.context_rollover.enabled:return {}
+        if self.config.continuity.policy == 'observe':return {}
         if not isinstance(event,dict):raise HookError('Invalid hook input')
         if event.get('hook_event_name')=='Stop':return self.stop(event)
         if event.get('hook_event_name')=='UserPromptSubmit':return self.user_prompt(event)
@@ -87,7 +102,8 @@ class HookDispatcher:
             guard['stop_prediction']=decision
             from .continuity import decide
             guard['continuity_policy']=decide(high_pressure=decision['decision']=='ARM').value
-            can_warn=self.allow_warning and state.mode==Mode.B.value
+            can_warn=(self.allow_warning and state.mode==Mode.B.value
+                      and self.config.continuity.policy=='guarded_owned_rollover')
             changed=replace(state,pending_answer_path=str(path),last_turn_id=turn,telemetry=telemetry)
             if can_warn and decision['decision']=='ARM':
                 if changed.state==State.NORMAL.value:changed=changed.transition(State.ARMED)
@@ -124,6 +140,7 @@ class HookDispatcher:
         return {'id':ident,'path':str(path),'sha256':digest}
 
     def user_prompt(self,event):
+        if self.config.continuity.policy != 'guarded_owned_rollover':return {}
         if not self.allow_prompt_block:return {}
         output={};captured=None
         # A corrupt primary may still be inspected non-actionably. Capture in the inbox only.
@@ -173,7 +190,9 @@ class HookDispatcher:
     def pre_compact(self,event):
         if event.get('trigger')!='auto':return {}
         output={}
-        block=self.allow_precompact_block and self.config.emergency.block_auto_compact
+        guarded=self.config.continuity.policy=='guarded_owned_rollover'
+        block=guarded and self.allow_precompact_block and self.config.emergency.block_auto_compact
+        force=guarded and self.allow_prompt_block and self.config.emergency.force_rollover_on_next_prompt
         def mutate(state):
             validate_event(event,state)
             if state.mode!=Mode.B.value:return state
@@ -188,9 +207,9 @@ class HookDispatcher:
                     raise HookError('Emergency snapshot conflict')
             saved=json.loads(read_private(snapshot))
             t=dict(state.telemetry);guard=dict(t.get('guard',{}));t['guard']=guard
-            guard['emergency_snapshot']=str(snapshot);guard['force_rollover_on_next_prompt']=self.config.emergency.force_rollover_on_next_prompt
+            guard['emergency_snapshot']=str(snapshot);guard['force_rollover_on_next_prompt']=force
             guard['prediction_miss']=saved['state']['state']==State.NORMAL.value
-            if not block and not self.config.emergency.force_rollover_on_next_prompt:
+            if not block and not force:
                 guard['continuity_policy']='OBSERVE'
                 return replace(state,telemetry=t)
             target=State.EMERGENCY if state.state in {State.NORMAL.value,State.ARMED.value,State.EMERGENCY.value} else State.RECOVERY

@@ -13,7 +13,7 @@ from .capability_probe import probe
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="crg")
     sub = parser.add_subparsers(dest="command", required=True)
-    chat = sub.add_parser("chat", help="Own a JSONL chat and automatically route guarded rollovers")
+    chat = sub.add_parser("chat", help="Own a JSONL chat with explicit fresh-task routing")
     chat.add_argument("--workspace", type=Path, default=Path.cwd())
     chat.add_argument("--schema", type=Path, default=None)
     chat.add_argument("--model")
@@ -25,15 +25,21 @@ def main(argv=None):
     doctor = sub.add_parser("doctor", help="Inspect cached capabilities; use --probe for isolated RPC")
     doctor.add_argument("--probe", action="store_true")
     doctor.add_argument("--workspace", type=Path, default=Path.cwd())
-    doctor.add_argument("--evidence", type=Path, default=None)
+    doctor.add_argument("--evidence-root", "--evidence", dest="evidence", type=Path, default=None)
     doctor.add_argument("--surface", default="unknown")
     doctor.add_argument("--codex", help="Override the CRG-configured installed runtime")
     doctor.add_argument('--format', choices=['json', 'human'], default='json')
     init = sub.add_parser('init', help='Create disabled workspace configuration; never install hooks')
     init.add_argument('--workspace', type=Path, default=Path.cwd())
     config = sub.add_parser("config", help="Show effective CRG config (never Codex secrets)")
+    config.add_argument('action', nargs='?', choices=['show', 'migrate'], default='show')
     config.add_argument("--workspace", type=Path, default=Path.cwd())
     config.add_argument("--codex", help="User-local runtime override for this inspection")
+    migration_mode = config.add_mutually_exclusive_group()
+    migration_mode.add_argument('--dry-run', action='store_true')
+    migration_mode.add_argument('--apply', action='store_true')
+    config.add_argument('--output', type=Path)
+    config.add_argument('--expected-sha256')
     for name in ("observe", "status"):
         command=sub.add_parser(name, help="Explicit offline event ingestion" if name=="observe" else "Read session state")
         command.add_argument("--workspace",type=Path,default=Path.cwd())
@@ -114,6 +120,13 @@ def main(argv=None):
     resolve.add_argument('--effort', required=True)
     resolve.add_argument('--at', required=True)
     resolve.add_argument('--expected-revision')
+    resolve.add_argument('--schema', type=Path)
+    resolve.add_argument('--manifest', type=Path)
+    resolve.add_argument('--binding', type=Path, help='Trusted adapter runtime/account scope projection; no credentials')
+    resolve.add_argument('--authorized-params', type=Path, help='Already authorized turn envelope; preparation only')
+    resolve.add_argument('--execution-mode', default='single_agent')
+    resolve.add_argument('--service-tier')
+    resolve.add_argument('--permission-profile')
     args = parser.parse_args(argv)
     try:
         if args.command == 'statistical-audit':
@@ -127,8 +140,14 @@ def main(argv=None):
             from .models import resolve_action
             catalog = json.loads(args.catalog.read_text())
             catalog = catalog.get('runtime', {}).get('model_catalog', catalog)
+            from .appserver import ProtocolSchema
+            schema = ProtocolSchema(args.schema, manifest_path=args.manifest) if args.schema else None
             result = resolve_action(catalog, model_id=args.model, effort=args.effort,
-                                    at=args.at, expected_revision=args.expected_revision)
+                                    at=args.at, expected_revision=args.expected_revision, schema=schema,
+                                    binding=json.loads(args.binding.read_text()) if args.binding else None,
+                                    authorized_params=json.loads(args.authorized_params.read_text()) if args.authorized_params else None,
+                                    execution_mode=args.execution_mode, service_tier=args.service_tier,
+                                    permission_profile=args.permission_profile)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if result['status'] == 'RESOLVED' else 2
         if args.command in {'predict','complete-observation'}:
@@ -195,17 +214,19 @@ def main(argv=None):
             from .recovery import transaction_status,reconcile_forward,reconcile_archive
             if not args.transaction_root.is_dir() or not args.archive_root.is_dir():raise ValueError("Existing transaction/archive roots required")
             if not (args.transaction_root/args.rollover_id).is_dir():raise ValueError("Transaction not found")
+            recovery_config=load_config(args.workspace)
             client=SimpleNamespace(workspace=args.workspace.resolve())
             if args.reconcile:
                 from .appserver import ProtocolSchema,AppServerClient
                 from .runtime_paths import RuntimePaths
-                paths = RuntimePaths.resolve(args.workspace, load_config(args.workspace))
+                paths = RuntimePaths.resolve(args.workspace, recovery_config)
                 schema=ProtocolSchema(args.schema or paths.schema_cache,
                                       manifest_path=None if args.schema else paths.capability_receipt)
                 client=AppServerClient(schema.runtime_binary,schema,args.workspace,expected_version=schema.runtime_version)
                 client.start()
             try:
-                coordinator=Coordinator(args.transaction_root,args.archive_root,client,owned_surface=True)
+                coordinator=Coordinator(args.transaction_root,args.archive_root,client,owned_surface=True,
+                                        archive_source=recovery_config.rollover.archive_old_thread)
                 result=(reconcile_forward(coordinator,args.rollover_id) if args.reconcile=="forward" else
                         reconcile_archive(coordinator,args.rollover_id) if args.reconcile=="archive" else
                         transaction_status(coordinator,args.rollover_id))
@@ -244,16 +265,31 @@ def main(argv=None):
         elif args.command=="hook":
             from .state_store import StateStore
             from .hooks import HookDispatcher
-            config=load_config(args.workspace)
-            if not config.context_rollover.enabled:
+            from .hook_failure import failure_output
+            event=None
+            config_error=None
+            try:config=load_config(args.workspace)
+            except (OSError,ValueError,RuntimeError,KeyError,TypeError) as exc:config_error=exc
+            if config_error is None and not config.context_rollover.enabled:
                 print("{}");return 0
-            store=StateStore(args.state_root,args.workspace,args.session)
-            state=store.read()
-            if state is None or state.thread_id!=args.thread:raise ValueError("Hook thread binding unavailable")
-            dispatcher=HookDispatcher(store,config,allow_warning=args.allow_warning,
-                allow_prompt_block=args.allow_prompt_block,allow_precompact_block=args.allow_precompact_block,
-                archive_root=args.archive_root or config.paths(args.workspace)[0])
-            result=dispatcher.dispatch(json.load(sys.stdin))
+            try:
+                raw=sys.stdin.read(16*1024*1024+1)
+                if len(raw)>16*1024*1024:raise ValueError('Hook input exceeds limit')
+                event=json.loads(raw)
+                if config_error is not None:raise config_error
+                store=StateStore(args.state_root,args.workspace,args.session)
+                state=store.read()
+                if state is None or state.thread_id!=args.thread:raise ValueError("Hook thread binding unavailable")
+                # Legacy flags are requests, not verified current-session capability.
+                # Keep stdout non-blocking until an adapter provides that contract.
+                dispatcher=HookDispatcher(store,config,allow_warning=False,
+                    allow_prompt_block=False,allow_precompact_block=False,
+                    archive_root=args.archive_root or config.paths(args.workspace)[0])
+                result=dispatcher.dispatch(event)
+            except (OSError,ValueError,RuntimeError,KeyError,TypeError) as exc:
+                result,code=failure_output(event,exc)
+                print(json.dumps(result,ensure_ascii=False))
+                return code
         elif args.command in {"observe","status"}:
             from .state_store import StateStore
             from .domain import SessionState,workspace_id
@@ -278,10 +314,21 @@ def main(argv=None):
                     if args.input:source.close()
                 return 0
         elif args.command == "config":
-            overrides = {"context_rollover": {"codex_binary": args.codex}} if args.codex is not None else None
-            effective, sources = resolve_config(args.workspace, overrides=overrides)
-            result = asdict(effective)
-            result["sources"] = sources
+            if args.action == 'migrate':
+                from .config_migration import migrate
+                if args.codex is not None:
+                    raise ValueError('Migration preserves the source runtime setting; --codex is inspection-only')
+                result = migrate(args.workspace, apply=args.apply, output=args.output,
+                                 expected_sha256=args.expected_sha256)
+            else:
+                if args.apply or args.dry_run or args.output is not None or args.expected_sha256 is not None:
+                    raise ValueError('Migration options require config migrate')
+                from .config import migration_diagnostics
+                overrides = {"context_rollover": {"codex_binary": args.codex}} if args.codex is not None else None
+                effective, sources = resolve_config(args.workspace, overrides=overrides)
+                result = asdict(effective)
+                result["sources"] = sources
+                result['warnings'] = migration_diagnostics(effective, sources)
         elif args.command == 'init':
             from .diagnostics import initialize
             result = initialize(args.workspace)

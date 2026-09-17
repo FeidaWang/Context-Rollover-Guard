@@ -1,3 +1,4 @@
+from tests.support.fixtures import fixture_path
 from dataclasses import replace
 from pathlib import Path
 import hashlib
@@ -218,7 +219,7 @@ class Foundation(unittest.TestCase):
         self.assertTrue(result['errors'])
 
     def test_public_schema_contract(self):
-        path=Path(__file__).resolve().parents[2]/'tests/fixtures/protocol/schema'
+        path=fixture_path('protocol/schema')
         result=inspect_schema(path)
         self.assertTrue(all(result['methods'].values()))
         self.assertTrue(all(result['hooks_supported'].values()))

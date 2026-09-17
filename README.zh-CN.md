@@ -98,3 +98,5 @@ CRG 将未知结果视为恢复工作，而不是重试授权。除非已获授�
 ### M4 离线实验
 
 新增 `statistical-audit`、`resolve-model` 和供测试适配器使用的重置事务引擎，详见 [M4 契约说明](docs/metrics/EXPERIMENTAL-M4.md)。这些实现不会启用高级策略或实际兑换重置额度。[CRG-0301～0401 验收报告](docs/implementation/CRG-0301-0401-RESULTS.md) 区分了已通过的离线测试与尚缺的真实数据、运行时及 Windows/附件证据；整批任务尚未满足上线验收条件。
+
+执行与恢复提供本地去重、提交前持久化意图，以及接受状态不明时不盲目重发的保证，不承诺分布式恰好一次交付。归档策略、配置支持与恢复限制见[执行配置与信任语义](docs/architecture/execution-semantics.md)。

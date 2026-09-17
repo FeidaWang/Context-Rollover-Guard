@@ -1,3 +1,4 @@
+from tests.support.fixtures import fixture_path
 from dataclasses import replace
 import contextlib
 import io
@@ -54,6 +55,13 @@ class RuntimePathTests(unittest.TestCase):
         self.assertEqual(legacy.schema_cache, self.workspace/'explicit-old-location/schema')
         self.assertEqual(legacy.capability_receipt, self.workspace/'explicit-old-location/capabilities.json')
 
+    def test_evidence_root_is_workspace_relative_and_cli_overridable(self):
+        config, _ = self.config(evidence_root='external/evidence')
+        paths = RuntimePaths.resolve(self.workspace, config)
+        self.assertEqual(paths.capability_receipt, self.workspace/'external/evidence/capabilities.json')
+        self.assertEqual(RuntimePaths.resolve(self.workspace, config, evidence='override').schema_cache,
+                         self.workspace/'override/schema')
+
     def test_init_is_disabled_and_never_overwrites(self):
         initialize(self.workspace)
         before = (self.workspace/'crg.toml').read_bytes()
@@ -92,16 +100,20 @@ class RuntimePathTests(unittest.TestCase):
     def test_schema_integrity_and_runtime_binding_not_live_trust(self):
         config, sources = self.config(codex_binary=sys.executable)
         paths = RuntimePaths.resolve(self.workspace, config)
-        shutil.copytree(ROOT/'tests/fixtures/protocol/schema', paths.schema_cache)
-        receipt = json.loads((ROOT/'tests/fixtures/protocol/capabilities.json').read_text())
-        receipt.update(binary=sys.executable, schema_generation_ok=True, generated_at='2000-01-01T00:00:00Z')
-        paths.capability_receipt.write_text(json.dumps(receipt))
+        shutil.copytree(fixture_path('protocol/schema'), paths.schema_cache)
+        paths.capability_receipt.parent.chmod(0o700)
+        from crg.capability_evidence import publish, digest
+        receipt = publish(paths.capability_receipt, paths.schema_cache,
+                          dict(binary=str(Path(sys.executable).resolve()), binary_sha256=digest(Path(sys.executable).read_bytes()),
+                               codex_version='fixture', surface='detached_cli', schema_generation_ok=True, errors=[]),
+                          {str(p.relative_to(paths.schema_cache)):p.read_bytes() for p in paths.schema_cache.rglob('*.json')})
+        generation = paths.schema_cache/receipt['generation']
         result = diagnose(self.workspace, config, sources)
         self.assertTrue(result['runtime_available'])
         self.assertTrue(result['schema_verified'])
         self.assertIsNone(result['hooks_trusted'])
         self.assertIsNone(result['telemetry_available'])
-        (paths.schema_cache/'ClientRequest.json').write_text('{}')
+        (generation/'ClientRequest.json').write_text('{}')
         self.assertFalse(diagnose(self.workspace, config, sources)['schema_verified'])
         import hashlib
         receipt['schema_sha256']['ClientRequest.json'] = hashlib.sha256(b'{}').hexdigest()
@@ -146,11 +158,12 @@ class RuntimePathTests(unittest.TestCase):
         def fake_run(args, **kwargs):
             if 'generate-json-schema' in args:
                 destination = Path(args[args.index('--out')+1])
-                shutil.copytree(ROOT/'tests/fixtures/protocol/schema', destination, dirs_exist_ok=True)
+                shutil.copytree(fixture_path('protocol/schema'), destination, dirs_exist_ok=True)
             return SimpleNamespace(returncode=0, stdout='codex-cli fixture', stderr='')
         with patch('crg.capability_probe.inventory', return_value={}), patch('crg.capability_probe.shutil.which', return_value=sys.executable), patch('crg.capability_probe.subprocess.run', side_effect=fake_run), patch('crg.capability_probe.isolated_rpc', return_value={'initialize_ok': True}):
             probe(self.workspace, self.root/'unused', paths=paths)
-        self.assertTrue((paths.schema_cache/'ClientRequest.json').exists())
+        receipt=json.loads(paths.capability_receipt.read_text())
+        self.assertTrue((paths.schema_cache/receipt['generation']/'ClientRequest.json').exists())
         self.assertEqual(paths.capability_receipt.stat().st_mode & 0o777, 0o600)
         self.assertTrue((paths.evidence_exports/'CAPABILITY_REPORT.md').exists())
         self.assertFalse((self.root/'unused').exists())

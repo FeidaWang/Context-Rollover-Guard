@@ -1,5 +1,4 @@
 """Read-only diagnostics. Cached observations never prove live session activation."""
-import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -24,17 +23,9 @@ def diagnose(workspace, config, sources, *, evidence=None, binary=None):
     executable = shutil.which(binary or config.context_rollover.codex_binary or 'codex')
     verified = False
     try:
-        hashes = receipt.get('schema_sha256', {})
-        if (executable and receipt.get('binary') and receipt.get('schema_generation_ok') is True
-                and isinstance(receipt.get('codex_version'), str) and receipt['codex_version']
-                and Path(executable).resolve() == Path(receipt['binary']).resolve()
-                and isinstance(hashes, dict) and 'ClientRequest.json' in hashes):
-            for name, digest in hashes.items():
-                target = paths.schema_cache/name
-                if Path(name).is_absolute() or not target.resolve().is_relative_to(paths.schema_cache.resolve()):
-                    raise ValueError('Invalid schema path')
-                if hashlib.sha256(target.read_bytes()).hexdigest() != digest:
-                    raise ValueError('Schema integrity mismatch')
+        if executable:
+            from .capability_evidence import validate
+            validate(receipt, paths.schema_cache, binary=executable, for_action=True)
             from .appserver import ProtocolSchema
             schema = ProtocolSchema(paths.schema_cache, manifest_path=paths.capability_receipt)
             if not {'initialize', 'thread/start', 'turn/start', 'thread/archive'} <= set(schema.methods):
@@ -44,9 +35,8 @@ def diagnose(workspace, config, sources, *, evidence=None, binary=None):
         errors.append('Schema cache is incomplete, corrupt, or unbound')
     hooks = read(Path(workspace)/'.codex/hooks.json').get('hooks', {})
     discovered = isinstance(hooks, dict) and any(isinstance(v, list) and bool(v) for v in hooks.values())
-    warnings = []
-    if config.context_rollover.mode != 'auto':
-        warnings.append('Legacy MODE_A/B/C policy names remain supported; migration tooling is pending.')
+    from .config import migration_diagnostics
+    warnings = migration_diagnostics(config, sources)
     return {
         'configured': any(source != 'default' for section in sources.values() for source in section.values()),
         'runtime_available': executable is not None,
@@ -58,6 +48,7 @@ def diagnose(workspace, config, sources, *, evidence=None, binary=None):
         'guard_active_for_session': None if config.context_rollover.enabled else False,
         'paths': paths.as_dict(),
         'configured_mode': config.context_rollover.mode,
+        'continuity_policy': config.continuity.policy,
         'runtime_binary': executable,
         'cached_runtime_version': receipt.get('codex_version'),
         'observed_at': receipt.get('generated_at'),

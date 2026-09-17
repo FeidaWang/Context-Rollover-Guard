@@ -1,0 +1,4 @@
+interface:
+  display_name: "Context Rollover Guard"
+  short_description: "Test CRG and resume work from verified handoffs"
+  default_prompt: "使用 $context-rollover-guard 运行离线自测，并检查当前项目的上下文交接状态。"

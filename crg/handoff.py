@@ -1,7 +1,37 @@
 """Workspace facts and archive pointers, never transcript summaries or executable commands."""
 import json
+import hashlib
+import os
+import stat
 from pathlib import Path
 import subprocess
+
+
+def configuration_fingerprints(cwd):
+    """Bounded, content-free local review evidence; neither identity nor authority."""
+    rows = []
+    for name in ('AGENTS.md', 'AGENTS.override.md', '.codex/config.toml', '.codex/hooks.json', 'crg.toml'):
+        path = Path(cwd)/name
+        row = {'path': name, 'sha256': None, 'status': 'UNKNOWN', 'replayable': False}
+        try:
+            if any(p.is_symlink() for p in (path, *path.parents)):
+                raise ValueError('Symlink configuration not fingerprinted')
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(fd, 'rb') as stream:
+                info = os.fstat(stream.fileno())
+                if not stat.S_ISREG(info.st_mode) or info.st_size > 1024*1024:
+                    raise ValueError('Unsupported configuration file')
+                data = stream.read(1024*1024 + 1)
+                after = os.fstat(stream.fileno())
+                if len(data) > 1024*1024 or (info.st_size, info.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+                    raise ValueError('Configuration changed while fingerprinting')
+                row.update(sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), status='HASHED')
+        except FileNotFoundError:
+            row['status'] = 'ABSENT'
+        except (OSError, ValueError):
+            pass
+        rows.append(row)
+    return rows
 
 
 def workspace_snapshot(cwd: Path) -> dict:
@@ -11,7 +41,8 @@ def workspace_snapshot(cwd: Path) -> dict:
                               env=None)
         return result.stdout if result.returncode==0 else None
     root=git('rev-parse','--show-toplevel')
-    result={'cwd':str(cwd),'repo_root':None,'git_branch':None,'git_head':None,'dirty_status':[]}
+    result={'cwd':str(cwd),'repo_root':None,'git_branch':None,'git_head':None,'dirty_status':[],
+            'configuration_fingerprints':configuration_fingerprints(cwd)}
     if root is None:return result
     result['repo_root']=root.decode(errors='surrogateescape').rstrip('\n')
     for key,cmd in [('git_branch',('symbolic-ref','--short','HEAD')),('git_head',('rev-parse','--verify','HEAD'))]:

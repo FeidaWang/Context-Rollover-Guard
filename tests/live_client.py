@@ -5,6 +5,8 @@ from crg.appserver import AppServerClient,ProtocolSchema,ExecutionSettings
 from tests.support.live_server import LiveServer
 
 def main():
+    from tests.support.live_policy import require_live_authorization
+    require_live_authorization('live_client')
     p=argparse.ArgumentParser();p.add_argument('--scratch',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--duplicate-test',action='store_true');a=p.parse_args()
     schema=ProtocolSchema(Path('docs/context-rollover/evidence/schema'))
     fixture=LiveServer(a.scratch,schema.runtime_binary,command_only=True)

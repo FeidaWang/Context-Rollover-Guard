@@ -1,3 +1,4 @@
+from tests.support.fixtures import fixture_path
 from pathlib import Path
 import tempfile,json,unittest
 from unittest.mock import patch
@@ -20,8 +21,8 @@ class RepoHookTests(unittest.TestCase):
         receipt=self.root/'.state/runtime/capabilities.json'
         (self.root/'.state').mkdir(mode=0o700)
         receipt.parent.mkdir(mode=0o700)
-        receipt.write_text((Path(__file__).resolve().parents[2]/'tests/fixtures/native-capabilities.json').read_text())
-    def test_missing_runtime_evidence_stays_unverified(self):
+        receipt.write_text((fixture_path('native-capabilities.json')).read_text())
+    def test_missing_runtime_evidence_remains_historical(self):
         read = Path.read_text
         def missing(path, *args, **kwargs):
             if path.name == 'capabilities.json':
@@ -31,8 +32,20 @@ class RepoHookTests(unittest.TestCase):
             dispatch_repo(self.base|{'hook_event_name':'Stop','last_assistant_message':'synthetic answer',
                                     'transcript_path':str(self.log)},self.root,native_home=self.home)
         state=StateStore(self.root/'.state',self.root,'session').read()
-        self.assertEqual(state.telemetry['repo_adapter']['telemetry_status'],'UNAVAILABLE_OR_UNVERIFIED')
+        self.assertEqual(state.telemetry['repo_adapter']['telemetry_status'],'OBSERVED_HISTORICAL_RECORD')
         self.assertEqual(state.telemetry['guard']['stop_prediction']['decision'],'UNKNOWN')
+
+    def test_resumed_creation_version_is_never_current(self):
+        self.rows[0]['payload']['cli_version'] = 'older-runtime'
+        self.log.write_text(''.join(json.dumps(r)+'\n' for r in self.rows))
+        dispatch_repo(self.base|{'hook_event_name':'Stop','last_assistant_message':'exact\r\n🙂',
+                                'transcript_path':str(self.log)},self.root,native_home=self.home)
+        state=StateStore(self.root/'.state',self.root,'session').read()
+        self.assertEqual(state.telemetry['repo_adapter']['session_creation_version'],'older-runtime')
+        self.assertIsNone(state.telemetry['repo_adapter']['current_execution_version'])
+        self.assertEqual(state.telemetry['repo_adapter']['current_runtime_status'],'UNKNOWN')
+        self.assertEqual(state.telemetry['guard']['stop_prediction']['decision'],'UNKNOWN')
+        self.assertEqual(Path(state.pending_answer_path).read_bytes(),'exact\r\n🙂'.encode())
 
     def test_native_active_never_cumulative(self):
         result=transcript_events(self.log,session='session',cwd=self.root,version='0.153.4',allowed_root=self.sessions)
@@ -43,7 +56,18 @@ class RepoHookTests(unittest.TestCase):
         dispatch_repo(self.base|{'hook_event_name':'Stop','last_assistant_message':'原文\r\n🙂','transcript_path':str(self.log)},self.root,native_home=self.home)
         state=StateStore(self.root/'.state',self.root,'session').read()
         self.assertEqual(Path(state.pending_answer_path).read_bytes(),'原文\r\n🙂'.encode())
-        self.assertEqual(state.telemetry['repo_adapter']['telemetry_status'],'VERIFIED_ACTIVE_RECORD')
+        self.assertEqual(state.telemetry['repo_adapter']['telemetry_status'],'OBSERVED_HISTORICAL_RECORD')
+    def test_unknown_current_runtime_does_not_reuse_old_pending_telemetry(self):
+        from dataclasses import replace
+        dispatch_repo(self.base|{'hook_event_name':'SessionStart'},self.root,native_home=self.home)
+        store=StateStore(self.root/'.state',self.root,'session')
+        store.update(lambda state:replace(state,last_turn_id='turn',last_active_context_tokens=99000,
+            model_context_window=100000,telemetry={'pending':{'turn_id':'turn',
+                'active_context_tokens':99000,'model_context_window':100000}}))
+        dispatch_repo(self.base|{'hook_event_name':'Stop','last_assistant_message':'exact',
+                                'transcript_path':str(self.log)},self.root,native_home=self.home)
+        self.assertEqual(store.read().telemetry['guard']['stop_prediction']['decision'],'UNKNOWN')
+
     def test_null_transcript_keeps_answer_and_no_guessed_pressure(self):
         dispatch_repo(self.base|{'hook_event_name':'Stop','last_assistant_message':'answer','transcript_path':None},self.root,native_home=self.home)
         state=StateStore(self.root/'.state',self.root,'session').read()

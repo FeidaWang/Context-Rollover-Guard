@@ -104,3 +104,5 @@ Uninstall/revert instructions are next to installation steps in the [contributor
 ### Experimental M4 evaluation
 
 Offline `statistical-audit` and `resolve-model` commands, plus the injected-adapter reset transaction engine, are documented in [M4 contracts](docs/metrics/EXPERIMENTAL-M4.md). They do not activate an advanced policy or perform live reset redemption. See the [CRG-0301–0401 acceptance report](docs/implementation/CRG-0301-0401-RESULTS.md) for passing offline checks and outstanding real-data, runtime and Windows/attachment gates.
+
+Execution and recovery use local deduplication, durable submission intent, and no blind resend after ambiguous acceptance. They do not guarantee distributed exactly-once delivery. See [execution configuration and trust semantics](docs/architecture/execution-semantics.md) for archive policy, supported settings, and recovery limits.

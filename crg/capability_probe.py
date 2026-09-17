@@ -66,8 +66,8 @@ def isolated_rpc(binary: str, workspace: Path, *, schema_document=None) -> dict:
         (project / ".codex/hooks.json").write_text(json.dumps({"hooks": {
             e: [{"hooks": [{"type": "command", "command": "/usr/bin/true", "timeout": 10}]}]
             for e in events}}))
-        env = os.environ.copy()
-        env["CODEX_HOME"] = str(home)
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home),
+               "CODEX_HOME": str(home), "PYTHONNOUSERSITE": "1"}
         # No models, real threads, real prompts or hook trust modifications.
         with (root / "stderr.log").open("wb") as err:
             p = subprocess.Popen([binary, "app-server", "--stdio"], cwd=project, env=env,
@@ -100,7 +100,7 @@ def isolated_rpc(binary: str, workspace: Path, *, schema_document=None) -> dict:
                 if not result["initialize_ok"]:
                     return result
                 p.stdin.write(b'{"method":"initialized"}\n'); p.stdin.flush()
-                hooks = rpc(2, "hooks/list", {"cwds": [str(project), str(workspace)]})
+                hooks = rpc(2, "hooks/list", {"cwds": [str(project)]})
                 result["hooks_list_ok"] = "result" in hooks
                 result["hook_parser"] = [{"event": h["eventName"], "timeout_sec": h["timeoutSec"],
                     "trust": h["trustStatus"], "source": h["source"]}
@@ -193,50 +193,62 @@ def _write_private(path, data):
             os.unlink(temporary)
 
 
+def metadata_run(argv, *, timeout):
+    """Metadata commands use a disposable HOME and no inherited credential variables."""
+    with TemporaryDirectory(prefix='crg-metadata-') as tmp:
+        env = {'PATH': os.environ.get('PATH', ''), 'HOME': tmp, 'CODEX_HOME': tmp,
+               'PYTHONNOUSERSITE': '1'}
+        return subprocess.run(argv, cwd=tmp, env=env, capture_output=True, text=True, timeout=timeout)
+
+
 def probe(workspace: Path, out: Path, binary: str = "codex", surface: str = "unknown", *, paths=None) -> dict:
     from .durable import private_directory
     workspace = workspace.resolve()
     schema_destination = paths.schema_cache if paths else out/'schema'
     receipt = paths.capability_receipt if paths else out/'capabilities.json'
     private_directory(receipt.parent)
-    result = {"generated_at": now(), "surface": surface, "selected_mode": "MODE_A", "errors": []}
+    result = {"generated_at": now(), "surface": "detached_cli", "requested_surface": surface, "selected_mode": "MODE_A", "errors": []}
     try:
         result["inventory"] = inventory(workspace)
     except (OSError, ValueError) as exc:
         result["errors"].append(f"inventory: {type(exc).__name__}")
+    documents = {}
     executable = shutil.which(binary)
+    executable = str(Path(executable).resolve()) if executable else None
     result["binary"] = executable
+    result["binary_sha256"] = None
+    result["codex_version"] = None
     if executable:
         try:
-            version = subprocess.run([executable, "--version"], capture_output=True, text=True, timeout=15)
+            result["binary_sha256"] = hashlib.sha256(Path(executable).read_bytes()).hexdigest()
+            version = metadata_run([executable, "--version"], timeout=15)
+            if version.returncode:
+                raise ValueError("Runtime version unavailable")
             result["codex_version"] = version.stdout.strip()
-            daemon=subprocess.run([executable,"app-server","daemon","version"],capture_output=True,text=True,timeout=15)
-            result["daemon_control_probe"]={"available":daemon.returncode==0,"exit_code":daemon.returncode,
-                "reason":"control_socket_missing" if "No such file or directory" in daemon.stderr
-                         else "see installed daemon version command"}
-
             schema_document = None
             with TemporaryDirectory(prefix="crg-schema-") as tmp:
                 schema=Path(tmp)
-                generated = subprocess.run([executable, "app-server", "generate-json-schema", "--experimental",
-                                            "--out", str(schema)], capture_output=True, text=True, timeout=30)
+                generated = metadata_run([executable, "app-server", "generate-json-schema", "--experimental",
+                                            "--out", str(schema)], timeout=30)
                 result["schema_generation_ok"] = generated.returncode == 0
                 if generated.returncode == 0:
                     schema_document = json.loads((schema/"ClientRequest.json").read_text())
                     result["schema"] = inspect_schema(schema)
                     result["schema_sha256"] = {str(p.relative_to(schema)): hashlib.sha256(p.read_bytes()).hexdigest()
                                                 for p in sorted(schema.rglob("*.json"))}
-                    # Inspect only a fresh generated bundle, never stale files from a prior version.
-                    private_directory(schema_destination)
-                    for source in sorted(schema.rglob('*.json')):
-                        _write_private(schema_destination/source.relative_to(schema), source.read_bytes())
+                    documents = {str(p.relative_to(schema)): p.read_bytes()
+                                 for p in sorted(schema.rglob('*.json'))}
             result["runtime"] = isolated_rpc(executable, workspace, schema_document=schema_document)
+            if hashlib.sha256(Path(executable).read_bytes()).hexdigest() != result["binary_sha256"]:
+                raise ValueError("Runtime changed during probe")
         except (OSError, ValueError, RuntimeError, TypeError, KeyError, AttributeError, subprocess.SubprocessError) as exc:
             result["errors"].append(f"probe: {type(exc).__name__}: {exc}")
     else:
         result["errors"].append("Codex executable unavailable")
     result["selected_mode"] = select_mode(result)
-    _write_private(receipt, (json.dumps(result, ensure_ascii=False, indent=2) + "\n").encode())
+    from .capability_evidence import publish
+    result = publish(receipt, schema_destination, result, documents)
+    schema_destination = schema_destination / result["generation"]
     if paths and paths.evidence_exports:
         private_directory(paths.evidence_exports)
         report = render_report(result)
@@ -260,7 +272,8 @@ def render_report(d: dict) -> str:
         return "UNVERIFIED: no complete installed parser evidence"
     rows = {
         "codex_version": d.get("codex_version", "unavailable"),
-        "surface": d.get("surface", "unknown") + " (caller-declared; detached CLI probed)",
+        "surface": d.get("surface", "unknown"),
+        "requested_surface": str(d.get("requested_surface", "unknown")) + " (caller-declared; not verified)",
         "hooks_supported": schema.get("hooks_supported", {}),
         "stop_schema_ok": hook_status("stop"),
         "user_prompt_submit_schema_ok": hook_status("userPromptSubmit"),
@@ -302,10 +315,10 @@ No raw environment, auth, MCP configuration, transcript, prompt or answer is cop
 
 Probe commands: `codex --version`; `codex app-server generate-json-schema --experimental --out <evidence/schema>`;
 isolated `codex app-server --stdio`, `initialize`, `initialized`, `hooks/list`, `config/read`.
-Invalid-parameter requests check dispatch for `thread/start`, `turn/start`, `thread/archive` without
-creating threads, submitting prompts, running hooks or archiving anything. Inspect response codes
-in evidence: schema/dispatch presence is not an end-to-end guarantee. Probe home and synthetic hook
-configuration are isolated temporary files. No individual hook is trusted or executed by the probe.
+Read-only catalog discovery uses only schema-validated requests. No thread creation, turn,
+archive, reset redemption, hook execution or real configuration mutation is performed.
+The isolated environment does not inherit account credentials. Caller-declared surface is
+recorded separately from the detached CLI probe; it is not proof of Desktop ownership.
 
 ## Repository and configuration inspection
 
@@ -314,9 +327,6 @@ configuration are isolated temporary files. No individual hook is trusted or exe
 ```
 
 A null git_root means no repository was detected. Existing config files are read and hashed only.
-The supplied initial workspace was empty; a standalone package was created at
-`outputs/context-rollover-guard/`, without git init/commit/push. See INITIAL_ENVIRONMENT.md for
-that dated implementation-specific inspection, including existing skills and runtime limits.
 
 ## Installed schema extraction
 
@@ -354,8 +364,9 @@ MODE_A is the fail-safe selection until stronger evidence exists. MODE_B require
 Stop payload, trusted hook execution and prompt interception. MODE_C additionally requires active
 transport ownership, fresh same-cwd behavior and verified acceptance/deduplication/archive ordering.
 No hook execution, live multi-turn telemetry, actual compact boundary or UI attachment is proven by
-this probe. Unknown values remain unknown. Re-probe after upgrading Codex; the SHA manifest identifies
-the active bundle even if older generated files remain on disk.
+this probe. Unknown values remain unknown. Re-probe after upgrading Codex; the atomic manifest identifies
+one complete generation. Old generations do not authorize actions. Cached evidence expires
+for action after 24 hours and never establishes current Desktop process identity.
 
 ## Supplemental documentation (not runtime authority)
 
@@ -363,8 +374,4 @@ the active bundle even if older generated files remain on disk.
 nullable Stop answer and PreCompact `continue: false`. [Official App Server documentation](https://learn.chatgpt.com/docs/app-server)
 is supplemental; installed schema and parser evidence control compatibility decisions.
 
-## Gate CRG-0001
-
-Capability discovery can pass with explicit safe degradation. Foundation tests and unchanged
-production behavior must independently pass. See IMPLEMENTATION_STATUS.md for gate results.
 '''

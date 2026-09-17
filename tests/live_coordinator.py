@@ -27,6 +27,8 @@ def complete(client,turn):
     raise TimeoutError('Model completion')
 
 def main():
+    from tests.support.live_policy import require_live_authorization
+    require_live_authorization('live_coordinator')
     p=argparse.ArgumentParser();p.add_argument('--scratch',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--recover',action='store_true');a=p.parse_args()
     schema=ProtocolSchema(Path('docs/context-rollover/evidence/schema'));fixture=LiveServer(a.scratch,schema.runtime_binary,command_only=True)
     client=AppServerClient(schema.runtime_binary,schema,fixture.workspace,expected_version=schema.runtime_version,command=fixture.command)

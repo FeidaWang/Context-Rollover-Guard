@@ -21,7 +21,7 @@ class RuntimePaths:
         general = config.context_rollover
         home = Path(os.environ.get('CODEX_HOME', str(Path.home()/'.codex')))
         state = path(general.state_root or home/'context-rollover')
-        runtime = path(evidence) if evidence is not None else state/'runtime'
+        runtime = path(evidence) if evidence is not None else path(general.evidence_root or state/'runtime')
         return cls(state, path(general.archive_root),
                    runtime/'schema' if evidence is not None else path(general.schema_cache or runtime/'schema'),
                    runtime/'capabilities.json' if evidence is not None else path(general.capability_receipt or runtime/'capabilities.json'),

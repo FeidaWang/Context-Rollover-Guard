@@ -16,7 +16,7 @@ class Models(unittest.TestCase):
     def test_catalog_pages_and_drift(self):
         class Schema:
             methods={'model/list':{}}
-            def validate(self,*args):pass
+            def validate_action(self,*args):pass
         pages=iter([{'data':[{'id':'a'}],'nextCursor':'next'},{'data':[{'id':'b'}],'nextCursor':None}])
         result=discover_models(lambda *args:next(pages),Schema())
         self.assertEqual(result['status'],'VERIFIED_CATALOG');self.assertEqual(len(result['models']),2)

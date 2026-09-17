@@ -6,6 +6,8 @@ import base64,hashlib,json,os,socket,struct,subprocess,tempfile,threading,time
 from pathlib import Path
 
 def main():
+    from tests.support.live_policy import require_live_authorization
+    require_live_authorization('live_desktop_transport')
     import argparse
     parser=argparse.ArgumentParser()
     parser.add_argument("--run", action="store_true", required=True)

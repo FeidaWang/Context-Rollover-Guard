@@ -18,6 +18,10 @@ from .hooks import pending_answer
 
 class OwnedSession:
     def __init__(self, client, config, *, timeout=300, emit=None, approve=None, advice=None):
+        from .config import validate_execution_config
+        validate_execution_config(config)
+        if not config.context_rollover.enabled or config.context_rollover.mode != 'MODE_B' or config.continuity.policy == 'observe':
+            raise ValueError('Owned execution requires enabled MODE_B and an execution-capable continuity policy')
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError("Timeout must be finite and positive")
         self.client, self.config = client, config
@@ -36,12 +40,15 @@ class OwnedSession:
     def start(self, params):
         if self.thread is not None or self.blocked:
             raise ValueError('Session already started or requires recovery')
+        if params.get('cwd', str(self.client.workspace)) != str(self.client.workspace):
+            raise ValueError('Requested workspace mismatch')
         params = dict(params, cwd=str(self.client.workspace), ephemeral=False)
         self.record('start-intent', params)
         try:
             response = self.client.request('thread/start', params)
             self.record('started', response)
             self.settings = ExecutionSettings.from_start(response)
+            self.settings.verify_requested(params)
             self.settings.thread_params('')  # fail before accepting input if unreconstructible
             self.thread = response['thread']['id']
             if response['thread'].get('cwd') != str(self.client.workspace):
@@ -100,6 +107,8 @@ class OwnedSession:
     def submit(self, prompt, *, fresh=False):
         if self.blocked or not self.thread:
             raise ValueError('Session requires recovery; no automatic resend')
+        if type(fresh) is not bool:
+            raise ValueError('fresh must be boolean')
         if not isinstance(prompt, str):
             raise ValueError('Only exact text prompts are supported')
         self.sequence += 1
@@ -184,15 +193,16 @@ def run_chat(args):
     from .appserver import AppServerClient, ProtocolSchema
     from .config import load_config
     config = load_config(args.workspace)
-    if not config.context_rollover.enabled or config.context_rollover.mode != 'MODE_B':
+    if not config.context_rollover.enabled or config.context_rollover.mode != 'MODE_B' or config.continuity.policy == 'observe':
         raise ValueError('Owned chat requires installed MODE_B repo Hooks')
+    if (getattr(args, 'resume_run', None) or getattr(args, 'reconcile_run', None)) and (getattr(args, 'model', None) or getattr(args, 'permissions', None)):
+        raise ValueError('Resume/reconciliation preserves recorded settings; model/permission overrides require a separately authorized new task')
     from .runtime_paths import RuntimePaths
     paths = RuntimePaths.resolve(args.workspace, config)
     schema = ProtocolSchema(args.schema or paths.schema_cache,
                             manifest_path=None if args.schema else paths.capability_receipt)
     client = AppServerClient(schema.runtime_binary, schema, args.workspace,
-                             expected_version=schema.runtime_version,
-                             command=[schema.runtime_binary, '-c', 'features.hooks=true', 'app-server', '--stdio'])
+                             expected_version=schema.runtime_version)
     def emit(event):
         print(json.dumps(event, ensure_ascii=False), flush=True)
     def approve(event):
