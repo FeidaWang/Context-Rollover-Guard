@@ -4,6 +4,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from tests.support.model_registry import contract
+from crg.domain import now
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -17,11 +19,20 @@ class StatisticalWorkflow(unittest.TestCase):
                 '--input', str(rows), '--split-at', '2026-01-01T00:00:00Z'], cwd=ROOT, capture_output=True, text=True)
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertFalse(json.loads(completed.stdout)['production_ready'])
+            schema,binding,params=contract(Path(tmp).resolve())
+            for name,value in [('binding',binding),('params',params)]:
+                (Path(tmp)/(name+'.json')).write_text(json.dumps(value))
             catalog = Path(tmp)/'catalog.json'
-            catalog.write_text(json.dumps({'status':'VERIFIED_CATALOG','observed_at':'2026-01-01T00:00:00Z',
+            observed_at=now()
+            catalog.write_text(json.dumps({'status':'VERIFIED_CATALOG','observed_at':observed_at,'binding':binding,
                 'models':[{'id':'fixture-new-id', 'available':True, 'reasoning_efforts':['custom']}]}))
             command = [sys.executable, '-m', 'crg', 'resolve-model', '--catalog', str(catalog),
-                '--model','fixture-new-id','--effort','custom','--at','2026-01-01T00:00:00Z']
+                '--model','fixture-new-id','--effort','custom','--at',observed_at]
+            completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(completed.returncode, 2, completed.stderr)
+            self.assertEqual(json.loads(completed.stdout)['reason'], 'CURRENT_EXECUTION_CONTRACT_REQUIRED')
+            command += ['--schema',str(schema.schema_root),'--binding',str(Path(tmp)/'binding.json'),
+                        '--authorized-params',str(Path(tmp)/'params.json'),'--permission-profile',':read-only']
             completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertEqual(json.loads(completed.stdout)['status'], 'RESOLVED')

@@ -4,7 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "context-rollover-guard"
-version = "0.1.0"
+dynamic = ["version"]
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [{name = "FeidaWang"}]
 description = "Fail-safe, capability-gated Codex context rollover foundation"
 requires-python = ">=3.11"
 dependencies = []
@@ -14,3 +17,12 @@ crg = "crg.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["crg*"]
+
+[project.urls]
+Repository = "https://github.com/FeidaWang/Context-Rollover-Guard"
+
+[tool.setuptools.dynamic]
+version = {attr = "crg.__version__"}
+
+[tool.setuptools.package-data]
+crg = ["**/*.json"]

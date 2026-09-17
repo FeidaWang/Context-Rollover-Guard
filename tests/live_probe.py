@@ -16,6 +16,8 @@ from crg.telemetry import Observer
 
 
 def main():
+    from tests.support.live_policy import require_live_authorization
+    require_live_authorization('live_probe')
     p=argparse.ArgumentParser();p.add_argument('--scratch',type=Path,required=True)
     p.add_argument('--codex',default='codex');p.add_argument('--out',type=Path,required=True);p.add_argument('--compact',action='store_true')
     args=p.parse_args();args.out.mkdir(parents=True,exist_ok=True)

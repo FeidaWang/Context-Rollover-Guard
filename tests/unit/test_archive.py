@@ -1,3 +1,4 @@
+from crg.config import Continuity
 from dataclasses import replace
 from pathlib import Path
 import json
@@ -92,7 +93,7 @@ class StopHandler(unittest.TestCase):
         self.store=StateStore(self.root/'state',self.cwd,'session')
         self.initial=replace(SessionState.create(self.cwd,'session','thread'),mode=Mode.B.value)
         self.store.update(lambda s:s,initial=self.initial)
-        self.config=Config(context_rollover=General(enabled=True,mode='MODE_B'))
+        self.config=Config(continuity=Continuity(policy='guarded_owned_rollover'),context_rollover=General(enabled=True,mode='MODE_B'))
         self.observer=Observer(self.store,self.config)
         self.handler=HookDispatcher(self.store,self.config,allow_warning=True,configured_limit=20000,scope='total')
         self.event={'hook_event_name':'Stop','session_id':'session','thread_id':'thread','cwd':str(self.cwd),

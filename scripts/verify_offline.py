@@ -1,63 +1,135 @@
-"""Verify a clean source snapshot without credentials, private evidence, or network."""
-from pathlib import Path
+"""Verify an allowlisted disposable snapshot; no credentials or Git commits.
+
+--network-policy=os requires an OS boundary and verifies it before running tests.
+The local audit mode cannot certify OS isolation. No live runners are executed.
+"""
 import argparse
+import json
 import os
+from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 
+if sys.version_info < (3, 11):
+    raise SystemExit('Python >=3.11 is required')
 ROOT = Path(__file__).resolve().parents[1]
+PREFIXES = ('crg/', 'scripts/', 'tests/', 'skills/', '.github/workflows/')
+SINGLES = {'README.md', 'README.zh-CN.md', 'LICENSE', 'pyproject.toml', 'crg.toml', '.codex-plugin/plugin.json', '.gitignore'}
 
 
-def run(args, cwd, env=None):
-    subprocess.run(args, cwd=cwd, env=env, check=True)
+def selected(name):
+    path = Path(name)
+    return (not path.is_absolute() and '..' not in path.parts and
+            (name in SINGLES or name.startswith(PREFIXES)) and
+            not any(p in {'.env', 'auth.json', '__pycache__', '.crg-state', '.codex'} for p in path.parts) and
+            path.suffix not in {'.pyc', '.pyo'})
 
 
-def verify(root):
-    if (root/'docs/context-rollover/evidence').exists():
-        raise RuntimeError('Use --clean to exclude ignored private evidence')
-    with tempfile.TemporaryDirectory(prefix='crg-offline-home-') as tmp:
-        env = dict(os.environ, HOME=tmp, CODEX_HOME=tmp+'/codex',
-                   PYTHONPATH=str(root/'tests/support/offline_guard')+os.pathsep+str(root),
-                   PYTHONDONTWRITEBYTECODE='1')
-        python = sys.executable
-        run([python, '-m', 'unittest', 'discover', '-s', 'tests/unit', '-v'], root, env)
-        run([python, '-m', 'unittest', 'discover', '-s', 'tests/integration', '-v'], root, env)
-        run([python, 'scripts/build_release.py'], root, env)
-        run([python, 'scripts/build_release.py', '--verify'], root, env)
-        run([python, 'dist/context-rollover-guard/scripts/self_test.py'], root, env)
-        # Also execute the exported ZIP as an independent installation.
-        import zipfile
-        with zipfile.ZipFile(root/'dist/context-rollover-guard.zip') as bundle:
-            bundle.extractall(Path(tmp)/'exported')
-        run([python, str(Path(tmp)/'exported/context-rollover-guard/scripts/self_test.py')], root, env)
+def environment(root, checkout):
+    """Never inherit ambient credentials, proxies, Python startup paths or hooks."""
+    for name in ('home', 'codex', 'bin'):
+        (root/name).mkdir()
+    (root/'bin/python3').symlink_to(sys.executable)
+    (root/'bin/git').symlink_to(shutil.which('git'))
+    return dict(PATH=str(root/'bin'), HOME=str(root/'home'), CODEX_HOME=str(root/'codex'),
+                PYTHONNOUSERSITE='1', PYTHONDONTWRITEBYTECODE='1',
+                PYTHONPATH=str(checkout/'tests/support/offline_guard')+os.pathsep+str(checkout),
+                SOURCE_DATE_EPOCH='1700000000', LC_ALL='C')
 
+
+def assert_os_network(env, cwd):
+    # -I ignores the Python audit hook: a successful guard here must come from OS.
+    # Linux's empty network namespace must have no route; macOS must deny bind.
+    code = '''import errno, socket, sys
+from pathlib import Path
+if sys.platform.startswith('linux'):
+    if sorted(p.name for p in Path('/sys/class/net').iterdir()) != ['lo']:
+        raise RuntimeError('Expected isolated namespace with loopback only')
+    if len(Path('/proc/net/route').read_text().splitlines()) != 1:
+        raise RuntimeError('Unexpected route in isolated namespace')
+s = socket.socket()
+s.settimeout(1)
+try:
+    if sys.platform == 'darwin': s.bind(('127.0.0.1', 0))
+    elif sys.platform.startswith('linux'): s.connect(('192.0.2.1', 9))
+    else: raise RuntimeError('Unsupported OS network verification')
+except OSError as e:
+    allowed = {errno.EPERM, errno.EACCES} if sys.platform == 'darwin' else {errno.ENETUNREACH, errno.EPERM, errno.EACCES}
+    if e.errno not in allowed: raise
+else: raise RuntimeError('OS network boundary absent')
+finally: s.close()
+'''
+    subprocess.run([sys.executable, '-I', '-c', code], cwd=cwd, env=env, check=True, timeout=5)
+
+
+def run(args, cwd, env):
+    result = subprocess.run(args, cwd=cwd, env=env, text=True, capture_output=True, timeout=240)
+    print(result.stdout, end='')
+    print(result.stderr, end='', file=sys.stderr)
+    if result.returncode:
+        raise subprocess.CalledProcessError(result.returncode, args)
+    return result.stdout + result.stderr
+
+
+def verify(source=ROOT, *, network_policy='audit'):
+    source = Path(source).resolve()
+    # Read provenance only; never copy .git, account files, ignored evidence or a remote URL.
+    commit = subprocess.check_output(['git', 'rev-parse', '--verify', 'HEAD'], cwd=source, text=True).strip()
+    status = subprocess.check_output(['git', 'status', '--porcelain=v1', '-z', '--untracked-files=all'], cwd=source)
+    names = subprocess.check_output(['git','ls-files','-z','--cached','--others','--exclude-standard'], cwd=source).decode().split('\0')
+    names = sorted({n for n in names if selected(n)})
+    checks = []
+    with tempfile.TemporaryDirectory(prefix='crg-offline-') as temp:
+        root = Path(temp).resolve()
+        checkout = root/'checkout'; checkout.mkdir()
+        for name in names:
+            origin, target = source/name, checkout/name
+            if not origin.exists():
+                continue  # deleted tracked paths must remain absent
+            if any(p.is_symlink() for p in [origin, *origin.parents]):
+                raise RuntimeError('Refusing symlink snapshot input: '+name)
+            if not origin.is_file():
+                raise RuntimeError('Refusing non-file snapshot input: '+name)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(origin, target)
+        env = environment(root, checkout)
+        if network_policy == 'os': assert_os_network(env, checkout)
+        # Empty repository is only for workspace detection; no add/commit or user config.
+        subprocess.run([str(root/'bin/git'), 'init', '-q', str(checkout)], env=env, check=True)
+        # Build inside the disposable source with explicitly captured Git provenance.
+        script = "import json, sys; sys.path.insert(0, 'scripts'); from build_release import build_release; print(json.dumps(build_release('.', provenance=json.loads(sys.argv[1]))))"
+        provenance = json.dumps({'commit':commit, 'dirty':bool(status)})
+        run([sys.executable,'-c',script,provenance], checkout, env)
+        for suite in ('unit','integration'):
+            command = [sys.executable, '-m','unittest','discover','-s','tests/'+suite,'-v']
+            output = run(command, checkout, env)
+            count = re.search(r'Ran (\d+) tests?', output)
+            if not count or int(count[1]) == 0 or re.search(r'skipped=\d+', output):
+                raise RuntimeError('Required suite empty or skipped')
+            checks.append({'suite':suite,'passed':int(count[1]),'failed':0,'skipped':0})
+        run([sys.executable,'scripts/build_release.py','--verify'], checkout, env)
+        run([sys.executable,'scripts/check_release.py'], checkout, env)
+    result = {'result':'PASS', 'python':sys.version.split()[0], 'source_commit':commit,
+              'source_dirty':bool(status), 'network_policy':network_policy,
+              'os_network_verified':network_policy=='os', 'checks':checks,
+              'artifacts':'build + verify + 3 out-of-tree smoke checks',
+              'hosted_ci':'NOT_RUN by this local invocation'}
+    print(json.dumps(result, indent=2))
+    return result
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--clean', action='store_true', help='Snapshot non-ignored files into a temporary clean Git checkout')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--clean', action='store_true', help='Compatibility flag; all runs use disposable snapshots')
+    parser.add_argument('--network-policy', choices=('audit','os'), default='audit')
+    parser.add_argument('--report', type=Path, help='Save content-free result JSON locally')
     args = parser.parse_args()
-    if not args.clean:
-        verify(ROOT)
-        return
-    names = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
-    with tempfile.TemporaryDirectory(prefix='crg-clean-') as tmp:
-        root = Path(tmp)/'checkout'
-        root.mkdir()
-        for name in set(names)-{''}:
-            source = ROOT/name
-            if source.is_file():
-                target = root/name
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, target)
-        run(['git', 'init', '-q'], root)
-        run(['git', 'add', '.'], root)
-        run(['git', '-c', 'user.name=Offline Test', '-c', 'user.email=offline@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Offline verification snapshot'], root)
-        assert not subprocess.check_output(['git', 'status', '--porcelain'], cwd=root)
-        verify(root)
-
+    result = verify(network_policy=args.network_policy)
+    if args.report:
+        args.report.write_text(json.dumps(result,indent=2)+'\n')
 
 if __name__ == '__main__':
     main()

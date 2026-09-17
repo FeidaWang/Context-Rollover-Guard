@@ -16,6 +16,8 @@ from crg.telemetry import Observer
 
 
 def main():
+    from tests.support.live_policy import require_live_authorization
+    require_live_authorization('live_hooks')
     parser=argparse.ArgumentParser();parser.add_argument('--scratch',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True);parser.add_argument('--codex',required=True)
     args=parser.parse_args();scratch=args.scratch.resolve();out=args.out;out.mkdir(parents=True,exist_ok=True)
@@ -38,7 +40,7 @@ def main():
         report['parsed_hook_count']=sum(len(x['hooks']) for x in listed['data'])
         if report['parsed_hook_count']!=5:raise RuntimeError('fixture_hook_discovery_not_verified')
         started=server.rpc('thread/start',{'cwd':str(workspace),'model':'gpt-6-astra','ephemeral':True,
-            'sandbox':'read-only','approvalPolicy':'never','config':{'bypass_hook_trust':True},
+            'sandbox':'read-only','approvalPolicy':'never',
             'developerInstructions':'This is a fixture hook test. Reply exactly as requested. Never use tools.'})
         thread=started['thread']['id'];session=started['thread'].get('sessionId') or thread
         (scratch/'fixture-settings.json').write_text(json.dumps({'thread_id':thread,'session_id':session}))

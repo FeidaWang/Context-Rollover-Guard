@@ -12,6 +12,8 @@ import tomllib
 
 class LiveServer:
     def __init__(self, scratch: Path, binary="codex", *, fixture_hooks=False, on_event=None, command_only=False):
+        from tests.support.live_policy import require_live_authorization
+        require_live_authorization('LiveServer')
         self.scratch=scratch.resolve(); self.scratch.mkdir(parents=True,exist_ok=True)
         self.workspace=self.scratch/'workspace'; self.workspace.mkdir(exist_ok=True)
         self.events=[];self.buffer=b'';self.counter=0
@@ -25,12 +27,8 @@ class LiveServer:
         for name in config.get('mcp_servers',{}):
             if not re.fullmatch(r'[A-Za-z0-9_-]+',name):raise ValueError('unsupported_mcp_override_key')
             overrides['mcp_servers.'+name+'.enabled']=False
-        if fixture_hooks:overrides['bypass_hook_trust']=True
         args=[binary]
         for key,value in overrides.items():args+=['-c',key+'='+json.dumps(value)]
-        if fixture_hooks:
-            args+=['-c','projects={'+json.dumps(str(self.workspace))+'={trust_level="trusted"}}',
-                   '--dangerously-bypass-hook-trust']
         args+=['app-server','--stdio']
         self.command=args
         if command_only:return

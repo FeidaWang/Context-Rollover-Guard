@@ -2,6 +2,13 @@
 import os
 from pathlib import Path
 import sys
+import subprocess
+
+# Keep subprocess on its audited Popen/fork path. Some CPython/platform
+# combinations select posix_spawn even with close_fds=True. Direct posix_spawn
+# remains forbidden below; disabling this optimization avoids rejecting an
+# otherwise approved synthetic subprocess a second time.
+subprocess._USE_POSIX_SPAWN = False
 
 
 def guard(event, args):

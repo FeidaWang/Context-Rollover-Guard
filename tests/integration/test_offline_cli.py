@@ -4,7 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from tests.unit.test_observe import token,complete
+from tests.support.fixtures import fixture_path
 
 
 class OfflineCli(unittest.TestCase):
@@ -12,13 +12,7 @@ class OfflineCli(unittest.TestCase):
         project=Path(__file__).resolve().parents[2]
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary).resolve();workspace=root/'workspace';workspace.mkdir()
-            feed=root/'events.jsonl'
-            events=[]
-            for turn,active in [('one',10000),('two',20000),('three',235000)]:
-                events.extend([token(turn,active),complete(turn)])
-            events.append({'method':'thread/compacted','params':{'threadId':'thread','turnId':'three'}})
-            events.extend([token('four',30000),complete('four')])
-            feed.write_text(''.join(json.dumps(e)+'\n' for e in events))
+            feed=fixture_path('observe-sequence.jsonl')
             common=['--workspace',str(workspace),'--session','session','--state-root',str(root/'state')]
             run=subprocess.run([sys.executable,'-m','crg','observe',*common,'--thread','thread',
                 '--input',str(feed),'--scope','total'],cwd=project,capture_output=True,text=True,timeout=10)

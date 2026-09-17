@@ -56,6 +56,7 @@ class Coordinator:
         return private_directory(self.root/rid)
 
     def prepare(self,state:SessionState,prompt:str,settings:ExecutionSettings):
+        if not isinstance(prompt, str):raise TransactionError('Only exact text prompts are supported')
         state.validate()
         if state.state not in {State.ARMED.value,State.EMERGENCY.value,State.PREPARING.value}:
             raise TransactionError('Source is not armed for rollover')
@@ -76,8 +77,10 @@ class Coordinator:
         with exclusive_lock(directory):
             initial=self._read(directory,'prepared')
             payload={'source':state.to_dict(),'settings':settings.values,'archive':str(archive),
-                     'prompt_sha256':sha(prompt.encode()),'client_message_id':archive.name}
+                     'prompt_sha256':sha(prompt.encode()),'client_message_id':archive.name,
+                     'archive_source':initial.get('archive_source', False) if initial else self.archive_source}
             if initial is not None:
+                if 'archive_source' not in initial:payload.pop('archive_source')
                 if initial!=payload:raise TransactionError('Transaction preparation conflict')
             else:self._write(directory,'prepared',payload)
         return archive.name
@@ -149,11 +152,13 @@ class Coordinator:
             if archived is None:
                 if self._read(directory,'archive-intent'):return self._blocked(directory,'archive')
                 from .continuity import quiet_point
-                if not self.archive_source or not quiet_point(self.client, source.thread_id):
+                archive_allowed = self.archive_source and prepared.get('archive_source') is True
+                if not archive_allowed or not quiet_point(self.client, source.thread_id):
                     result={'state':State.NORMAL.value,'rollover_id':rid,'old_thread_id':source.thread_id,
                             'new_thread_id':new,'accepted_turn_id':accepted['turn_id'],
-                            'old_thread_archived':False,'source_retention_reason':'QUIET_POINT_UNVERIFIED' if self.archive_source else 'ARCHIVAL_DISABLED',
-                            'surface':'owned-app-server','desktop_switched':False}
+                            'old_thread_archived':False,'source_retention_reason':'QUIET_POINT_UNVERIFIED' if archive_allowed else 'ARCHIVAL_DISABLED',
+                            'surface':'owned-app-server','desktop_switched':False,
+                    'handoff_index':str(Path(prepared['archive'])/'handoff.json')}
                     self._write(directory,'committed',result)
                     return result
                 self._write(directory,'archive-intent',{'old_thread_id':source.thread_id,'accepted_turn_id':accepted['turn_id']})
@@ -164,6 +169,7 @@ class Coordinator:
                 except Exception:return self._blocked(directory,'archive')
             result={'state':State.NORMAL.value,'rollover_id':rid,'old_thread_id':source.thread_id,
                     'new_thread_id':new,'accepted_turn_id':accepted['turn_id'],'old_thread_archived':True,
-                    'surface':'owned-app-server','desktop_switched':False}
+                    'surface':'owned-app-server','desktop_switched':False,
+                    'handoff_index':str(Path(prepared['archive'])/'handoff.json')}
             self._write(directory,'committed',result)
             return result

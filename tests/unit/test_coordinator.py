@@ -1,3 +1,4 @@
+from tests.support.fixtures import fixture_path
 from dataclasses import replace
 from pathlib import Path
 import copy,json,tempfile,unittest
@@ -16,7 +17,7 @@ class FakeClient:
         return {'thread_id':thread_id,'complete':True,'turn_state':'completed','tools':[],'children':[]}
 
     def __init__(self,cwd):
-        self.workspace=cwd;self.schema=ProtocolSchema(ROOT/'tests/fixtures/protocol/schema');self.calls=[]
+        self.workspace=cwd;self.schema=ProtocolSchema(fixture_path('protocol/schema'));self.calls=[]
         self.response={'cwd':str(cwd),'model':'m','modelProvider':'openai','approvalPolicy':'never','approvalsReviewer':'user',
                        'sandbox':{'type':'readOnly','networkAccess':False},'reasoningEffort':'low',
                        'thread':{'id':'new','cwd':str(cwd),'turns':[]}}
@@ -59,7 +60,7 @@ class CoordinatorTests(unittest.TestCase):
             'turn_state':'completed','tools':[],'children':[{'state':'running'}]}
         self.assertFalse(self.c.run(self.rid)['old_thread_archived'])
 
-    def test_complete_exact_once_and_idempotent_repeat(self):
+    def test_local_deduplication_and_durable_receipt(self):
         result=self.c.run(self.rid);self.assertTrue(result['old_thread_archived']);self.assertFalse(result['desktop_switched'])
         self.assertEqual(self.c.run(self.rid),result)
         self.assertEqual([m for m,p in self.client.calls],['thread/start','turn/start','thread/archive'])

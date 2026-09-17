@@ -10,6 +10,8 @@ from crg.domain import State
 
 
 def main():
+    from tests.support.live_policy import require_live_authorization
+    require_live_authorization('live_owned_client')
     root=Path.cwd();schema=ProtocolSchema(root/'docs/context-rollover/evidence/schema')
     client=AppServerClient(schema.runtime_binary,schema,root,expected_version=schema.runtime_version,
         command=[schema.runtime_binary,'-c','features.hooks=true','app-server','--stdio'])

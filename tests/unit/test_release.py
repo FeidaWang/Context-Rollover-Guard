@@ -17,9 +17,11 @@ class ReleaseTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name).resolve()
-        for directory in ('crg', 'scripts', 'dist/context-rollover-guard'):
+        for directory in ('crg', 'scripts', 'skills/context-rollover-guard'):
             shutil.copytree(ROOT/directory, self.root/directory, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-        shutil.copyfile(ROOT/'pyproject.toml', self.root/'pyproject.toml')
+        for name in ('pyproject.toml', 'LICENSE', 'README.md', '.codex-plugin/plugin.json'):
+            (self.root/name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT/name, self.root/name)
         mock = patch.object(release.subprocess, 'check_output', side_effect=self.git)
         mock.start(); self.addCleanup(mock.stop)
 
@@ -130,3 +132,59 @@ class ReleaseTests(unittest.TestCase):
         with patch.object(release, 'ROOT', self.root), contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(release.main(['--verify']), 1)
         self.assertEqual(json.loads(output.getvalue())['result'], 'FAIL')
+
+    def test_different_directories_same_inputs_and_epoch(self):
+        self.build()
+        with tempfile.TemporaryDirectory() as temp:
+            other = Path(temp)/'checkout'
+            shutil.copytree(self.root, other)
+            release.build_release(other, epoch=1700000000)
+            self.assertEqual(release.files(self.root/'dist'), release.files(other/'dist'))
+
+    def test_epoch_changes_provenance_and_environment_is_respected(self):
+        with patch.dict(release.os.environ, {'SOURCE_DATE_EPOCH': '1700000042'}):
+            release.build_release(self.root)
+        info = json.loads((self.root/'dist/MANIFEST.json').read_bytes())['build']
+        self.assertEqual(info['epoch'], 1700000042)
+
+    def test_license_wheel_record_and_sdist_core(self):
+        import base64
+        import csv
+        import io
+        import tarfile
+        self.build()
+        wheel = release.unpack(next((self.root/'dist').glob('*.whl')).read_bytes())
+        record = next(k for k in wheel if k.endswith('/RECORD'))
+        for name, checksum, size in csv.reader(io.StringIO(wheel[record].decode())):
+            if name == record:
+                self.assertEqual((checksum,size), ('',''))
+            else:
+                self.assertEqual(int(size), len(wheel[name]))
+                self.assertEqual(checksum, 'sha256='+base64.urlsafe_b64encode(release.hashlib.sha256(wheel[name]).digest()).decode().rstrip('='))
+        self.assertEqual(wheel['crg/cli.py'], (self.root/'crg/cli.py').read_bytes())
+        self.assertEqual(wheel[next(k for k in wheel if k.endswith('/LICENSE'))], (self.root/'LICENSE').read_bytes())
+        with tarfile.open(next((self.root/'dist').glob('*.tar.gz'))) as archive:
+            name = next(n for n in archive.getnames() if n.endswith('/crg/cli.py'))
+            self.assertEqual(archive.extractfile(name).read(), wheel['crg/cli.py'])
+            self.assertTrue(all(m.uid == m.gid == 0 and m.mode == 0o644 for m in archive.getmembers()))
+
+    def test_private_input_rejected_before_publication(self):
+        self.build()
+        before = release.files(self.root/'dist')
+        (self.root/'crg/auth.json').write_text('{}')
+        with self.assertRaisesRegex(ValueError, 'Private state'): self.build()
+        self.assertEqual(before, release.files(self.root/'dist'))
+
+    def test_absolute_home_and_key_signatures_rejected(self):
+        for data in (b'/Users/example/private', b'/home/example/private', b'sk-'+b'a'*24):
+            with self.assertRaisesRegex(ValueError, 'Sensitive signature'):
+                release.scan({'data.txt':data})
+
+    def test_disposable_snapshot_provenance_needs_no_git_commit(self):
+        with patch.object(release.subprocess, 'check_output', side_effect=AssertionError('No Git access in snapshot build')):
+            result = release.build_release(self.root, epoch=1700000000,
+                                           provenance={'commit':'b'*40, 'dirty':True})
+        self.assertEqual(result['source_commit'], 'b'*40)
+        self.assertTrue(result['source_dirty'])
+        with self.assertRaisesRegex(ValueError, 'provenance'):
+            release.build_release(self.root, provenance={'commit':'invalid','dirty':True})

@@ -1,16 +1,23 @@
 from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 import unittest
+import tempfile
+from pathlib import Path
+from tests.support.model_registry import contract
 from crg.models import normalize_model, resolve_action
 
 
 class ModelResolution(unittest.TestCase):
     def setUp(self):
-        self.at = '2026-01-01T00:00:00Z'
-        self.catalog = {'status':'VERIFIED_CATALOG', 'observed_at':self.at, 'source':'synthetic',
+        temp=tempfile.TemporaryDirectory(); self.addCleanup(temp.cleanup)
+        self.schema,self.binding,self.params=contract(Path(temp.name).resolve())
+        self.at = datetime.now(timezone.utc).isoformat()
+        self.catalog = {'status':'VERIFIED_CATALOG', 'observed_at':self.at, 'source':'synthetic', 'binding':self.binding,
             'models':[asdict(normalize_model({'id':'unfamiliar-fixture-id',
                 'supportedReasoningEfforts':['custom']}, observed_at=self.at))]}
     def resolve(self, **changes):
-        return resolve_action(self.catalog, **(dict(model_id='unfamiliar-fixture-id', effort='custom', at=self.at) | changes))
+        return resolve_action(self.catalog, **(dict(model_id='unfamiliar-fixture-id', effort='custom', at=self.at, schema=self.schema, binding=self.binding,
+                    authorized_params=self.params, permission_profile=':read-only') | changes))
     def test_explicit_new_id_without_static_assumptions(self):
         result = self.resolve()
         self.assertEqual(result['status'], 'RESOLVED')
@@ -31,7 +38,7 @@ class ModelResolution(unittest.TestCase):
         self.assertEqual(self.resolve(expected_revision=result['capability_revision'])['status'], 'RESOLVED')
     def test_observation_time_not_a_capability_change(self):
         previous = self.resolve()['capability_revision']
-        self.catalog['observed_at'] = '2025-12-31T23:59:00Z'
+        self.catalog['observed_at'] = (datetime.fromisoformat(self.at)-timedelta(minutes=1)).isoformat()
         self.assertEqual(self.resolve(expected_revision=previous)['status'], 'RESOLVED')
 
     def test_malformed_effort_list_is_not_substring_matching(self):

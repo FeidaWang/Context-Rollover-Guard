@@ -14,6 +14,8 @@ from crg.telemetry import Observer
 
 
 def main():
+    from tests.support.live_policy import require_live_authorization
+    require_live_authorization('live_guard')
     parser=argparse.ArgumentParser();parser.add_argument('--scratch',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True);parser.add_argument('--codex',required=True)
     args=parser.parse_args();scratch=args.scratch.resolve();out=args.out;out.mkdir(parents=True,exist_ok=True)
@@ -28,7 +30,7 @@ def main():
         if observer and store.read().state in {'NORMAL','ARMED'}:observer.ingest(event)
     def start(*,prompt_block,precompact_block,compact_limit=None):
         nonlocal store,observer
-        config={'bypass_hook_trust':True}
+        config={}
         if compact_limit is not None:config['model_auto_compact_token_limit']=compact_limit
         response=server.rpc('thread/start',{'cwd':str(workspace),'model':'gpt-6-astra','ephemeral':True,
             'sandbox':'read-only','approvalPolicy':'never','config':config,

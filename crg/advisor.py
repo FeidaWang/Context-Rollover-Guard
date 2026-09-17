@@ -10,7 +10,9 @@ FEATURES={'files_touched_estimate','has_state_machine_change','has_protocol_chan
 
 def recommend(catalog,features,policy,history=None,*,at=None):
     result={'selected':None,'alternatives':[],'confidence':'unknown','sample_count':0,
-            'reason':'INSUFFICIENT_VERIFIED_INPUTS','additional_model_calls':0,'automatic_switch':False}
+            'reason':'INSUFFICIENT_VERIFIED_INPUTS','additional_model_calls':0,'automatic_switch':False,
+            'actionable':False,'execution_mode':'single_agent',
+            'execution_contract':'UNVERIFIED_PREVIEW_REQUIRES_RESOLUTION'}
     try:
         if set(features)-FEATURES:raise ValueError('Unknown task features')
         for key,value in features.items():
@@ -30,7 +32,13 @@ def recommend(catalog,features,policy,history=None,*,at=None):
         history=history or {};eligible=[]
         for model in catalog['models']:
             if model.get('available') is not True:continue
+            efforts=model.get('reasoning_efforts', [])
+            if (not isinstance(model.get('id'), str) or not model['id']
+                    or not isinstance(efforts, (list, tuple))
+                    or not all(isinstance(value, str) and value for value in efforts)):continue
             for configured in policy.get('candidates',[]):
+                if set(configured)-{'model_id','effort','cost_rank','capability_rank','approved_for'}:
+                    continue  # Advice never authorizes tools, agents, network or permission changes.
                 if configured.get('model_id')!=model['id'] or configured.get('effort') not in model.get('reasoning_efforts',[]):continue
                 if not risks<=set(configured.get('approved_for',[])):continue
                 rank=configured.get('cost_rank');capability=configured.get('capability_rank')

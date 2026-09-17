@@ -16,6 +16,7 @@ import tempfile
 import time
 import uuid
 from .domain import SessionState, State, now, workspace_id
+from .durable import read_private, open_private_lock
 
 
 class StoreError(RuntimeError):
@@ -129,7 +130,7 @@ class StateStore:
 
     @contextmanager
     def _lock(self):
-        fd = os.open(self.directory / "state.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        fd = open_private_lock(self.directory / "state.lock")
         deadline = time.monotonic() + self.timeout
         try:
             while True:
@@ -146,16 +147,11 @@ class StateStore:
 
     def _read_bytes(self, path: Path):
         try:
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+            return read_private(path,max_bytes=16*1024*1024)
         except FileNotFoundError:
             return None
-        with os.fdopen(fd, "rb") as f:
-            st = os.fstat(f.fileno())
-            if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077:
-                raise StoreError("Unsafe state file")
-            if st.st_size > 16 * 1024 * 1024:
-                raise CorruptState("State file exceeds limit")
-            return f.read()
+        except ValueError as exc:
+            raise StoreError('Unsafe or oversized state file') from exc
 
     def _decode(self, raw):
         state = decode(raw)

@@ -6,6 +6,8 @@ from crg.installer import plan_hooks,install_hooks
 from crg.state_store import StateStore
 
 def main():
+    from tests.support.live_policy import require_live_authorization
+    require_live_authorization('live_repo_hook')
     p=argparse.ArgumentParser();p.add_argument('--scratch',type=Path,required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
     scratch=a.scratch.resolve();workspace=scratch/'workspace';workspace.mkdir(parents=True,exist_ok=True);a.out.mkdir(parents=True,exist_ok=True)
     workspace.joinpath('crg.toml').write_text('[context_rollover]\nenabled=true\nmode="MODE_B"\nstate_root=".crg-state"\narchive_root=".archives"\n[predictor]\nhard_arm_remaining_tokens=999999\n')
@@ -16,7 +18,7 @@ def main():
     try:
         server.initialize()
         response=server.rpc('thread/start',{'cwd':str(workspace),'model':'gpt-6-astra','ephemeral':False,
-            'sandbox':'read-only','approvalPolicy':'never','config':{'bypass_hook_trust':True}})
+            'sandbox':'read-only','approvalPolicy':'never'})
         tid=response['thread']['id'];turn=server.complete_turn(tid,'Reply exactly CRG_REPO_ADAPTER_OK. Do not use tools.')
         state=StateStore(workspace/'.crg-state',workspace,tid).read()
         report.update(session_bound=state.session_id==tid,answer_exact=Path(state.pending_answer_path).read_bytes()==b'CRG_REPO_ADAPTER_OK',

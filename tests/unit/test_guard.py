@@ -1,3 +1,4 @@
+from crg.config import Continuity
 from dataclasses import replace
 from pathlib import Path
 import json
@@ -18,7 +19,7 @@ class GuardTests(unittest.TestCase):
         self.store=StateStore(self.root/'state',self.cwd,'session')
         self.initial=replace(SessionState.create(self.cwd,'session','thread'),mode=Mode.B.value)
         self.store.update(lambda s:s,initial=self.initial)
-        self.config=Config(context_rollover=General(enabled=True,mode='MODE_B'),
+        self.config=Config(continuity=Continuity(policy='guarded_owned_rollover'),context_rollover=General(enabled=True,mode='MODE_B'),
                            emergency=Emergency(block_auto_compact=True,force_rollover_on_next_prompt=True))
         self.handler=HookDispatcher(self.store,self.config,allow_prompt_block=True,allow_precompact_block=True,
                                     archive_root=self.root/'archives')
@@ -90,7 +91,7 @@ class GuardTests(unittest.TestCase):
         handler=HookDispatcher(self.store,self.config,allow_precompact_block=False)
         output=handler.dispatch(self.base|{'hook_event_name':'PreCompact','turn_id':'compact','trigger':'auto'})
         self.assertNotIn('continue',output)
-        self.assertEqual(self.store.read().state,'EMERGENCY')
+        self.assertEqual(self.store.read().state,'ARMED')
 
     def test_emergency_force_false_does_not_intercept_prompt(self):
         self.handler.dispatch(self.base|{'hook_event_name':'PreCompact','turn_id':'compact','trigger':'auto'})

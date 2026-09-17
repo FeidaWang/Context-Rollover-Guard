@@ -9,7 +9,6 @@ window_size = 8
 min_growth_tokens = 8000
 safety_buffer_tokens = 8000
 safety_buffer_percent = 0.03
-warn_probability = 0.75
 hard_arm_remaining_tokens = 12000
 derived_limit_percent = 0.90
 conservative_limit_percent = 0.80
@@ -24,3 +23,6 @@ forward_original_prompt = true
 [emergency]
 block_auto_compact = false
 force_rollover_on_next_prompt = false
+
+[continuity]
+policy = "native_cooperative"

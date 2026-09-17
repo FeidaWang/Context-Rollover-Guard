@@ -1,6 +1,7 @@
 """Private immutable artifact primitives; no user-file overwrite."""
 from contextlib import contextmanager
 from pathlib import Path
+import errno
 import fcntl
 import os
 import stat
@@ -22,13 +23,44 @@ def private_directory(path: Path):
     return path
 
 
-def read_private(path: Path):
-    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
-    with os.fdopen(fd,'rb') as f:
-        info=os.fstat(f.fileno())
-        if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or info.st_mode&0o077:
-            raise ValueError('Unsafe artifact file')
-        return f.read()
+@contextmanager
+def regular_file(path: Path, *, private=True, max_bytes=256*1024*1024):
+    """Pin every parent with openat; never follow a substituted parent symlink.
+
+    POSIX only. Ancestor renames keep the opened inode pinned. This is not a
+    sandbox against an attacker running as the same uid or a hostile filesystem.
+    """
+    path=Path(path).absolute()
+    parent=os.open(path.anchor,os.O_RDONLY|os.O_DIRECTORY)
+    fd=None
+    try:
+        for part in path.parts[1:-1]:
+            child=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
+            os.close(parent);parent=child
+        # Reject devices before open (opening a device can itself have effects).
+        before=os.stat(path.name,dir_fd=parent,follow_symlinks=False)
+        if stat.S_ISLNK(before.st_mode):raise OSError(errno.ELOOP,'Symlink artifact refused')
+        if not stat.S_ISREG(before.st_mode):raise ValueError('Nonregular artifact refused')
+        fd=os.open(path.name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
+        info=os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid()
+                or private and info.st_mode&0o077
+                or (before.st_dev,before.st_ino)!=(info.st_dev,info.st_ino)
+                or info.st_size>max_bytes):
+            raise ValueError('Unsafe or oversized artifact file')
+        with os.fdopen(fd,'rb') as stream:
+            fd=None
+            yield stream
+    finally:
+        if fd is not None:os.close(fd)
+        os.close(parent)
+
+
+def read_private(path: Path, *, max_bytes=256*1024*1024):
+    with regular_file(path,max_bytes=max_bytes) as stream:
+        data=stream.read(max_bytes+1)
+        if len(data)>max_bytes:raise ValueError('Artifact grew beyond size limit')
+        return data
 
 
 def sync_directory(path: Path):
@@ -50,9 +82,45 @@ def immutable_write(path: Path, data: bytes):
         if os.path.exists(temp):os.unlink(temp)
 
 
+def open_private_lock(path: Path):
+    """Open a bounded regular lock inode through pinned, no-follow parents."""
+    path=Path(path).absolute()
+    parent=os.open(path.anchor,os.O_RDONLY|os.O_DIRECTORY)
+    fd=None
+    try:
+        for part in path.parts[1:-1]:
+            child=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
+            os.close(parent);parent=child
+        for attempt in range(3):
+            try:before=os.stat(path.name,dir_fd=parent,follow_symlinks=False)
+            except FileNotFoundError:before=None
+            if before is not None and not stat.S_ISREG(before.st_mode):
+                raise ValueError('Nonregular lock refused')
+            flags=os.O_RDWR|os.O_NOFOLLOW|os.O_NONBLOCK
+            if before is None:flags|=os.O_CREAT|os.O_EXCL
+            try:
+                fd=os.open(path.name,flags,0o600,dir_fd=parent)
+                break
+            except FileExistsError:
+                # Local lock creation only, before any business mutation/RPC.
+                # Reinspect a concurrent creator rather than trusting its inode.
+                continue
+        else:raise ValueError('Unstable lock path')
+        info=os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid()
+                or info.st_mode&0o077 or info.st_size>4096
+                or before is not None and (before.st_dev,before.st_ino)!=(info.st_dev,info.st_ino)):
+            raise ValueError('Unsafe lock file')
+        result=fd;fd=None
+        return result
+    finally:
+        if fd is not None:os.close(fd)
+        os.close(parent)
+
+
 @contextmanager
 def exclusive_lock(directory: Path,timeout=10):
-    fd=os.open(directory/'.crg.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    fd=open_private_lock(directory/'.crg.lock')
     deadline=time.monotonic()+timeout
     try:
         while True:

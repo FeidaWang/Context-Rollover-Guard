@@ -80,3 +80,20 @@ load_config(Path.cwd())
             result = json.loads(output.getvalue())
             self.assertEqual(result['context_rollover']['codex_binary'], 'chosen')
             self.assertEqual(result['sources']['context_rollover']['codex_binary'], 'cli')
+
+    def test_shipped_self_test_leaves_home_and_codex_configuration_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)/'home'
+            home.mkdir()
+            codex = home/'.codex'
+            codex.mkdir()
+            settings = codex/'config.toml'
+            settings.write_bytes(b'# synthetic user configuration\n')
+            before = {p.relative_to(home):p.read_bytes() for p in home.rglob('*') if p.is_file()}
+            env = dict(os.environ, HOME=str(home), CODEX_HOME=str(codex))
+            result = subprocess.run([sys.executable, str(ROOT/'dist/context-rollover-guard/scripts/self_test.py')],
+                                    cwd=tmp, env=env, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+            self.assertEqual(json.loads(result.stdout)['result'], 'PASS')
+            after = {p.relative_to(home):p.read_bytes() for p in home.rglob('*') if p.is_file()}
+            self.assertEqual(before, after)

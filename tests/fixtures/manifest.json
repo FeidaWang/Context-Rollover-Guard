@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "source_head": "a3943f6b5287da7666851b519f4b2a8cd253e9f0",
+  "scope": "Existing public data/schema files; this index and README are metadata, excluded from self-hashing",
+  "fixtures": [
+    {
+      "path": "compaction-events.jsonl",
+      "sha256": "0f9a78a4065883683918308625146a3d8d2abe1eedd937e953a28469799c1db1",
+      "size_bytes": 2731,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_observe.py"
+      ]
+    },
+    {
+      "path": "continuity-benchmark.json",
+      "sha256": "0dbb66343aea6a989e2acebdbf69bdf160164226d25a07ca119992fe752c98d6",
+      "size_bytes": 358,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "scripts/benchmark_continuity.py"
+      ]
+    },
+    {
+      "path": "native-capabilities.json",
+      "sha256": "32191b25bb159c5c112526750aced237f801a74c67283dc83bd3035b586f42e2",
+      "size_bytes": 58,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_repo_hook.py"
+      ]
+    },
+    {
+      "path": "observe-sequence.jsonl",
+      "sha256": "026d8c769ae3ffa72e38b8551e722be125163e4545609b6df9455dda33d6f0fe",
+      "size_bytes": 2200,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/integration/test_offline_cli.py"
+      ]
+    },
+    {
+      "path": "protocol/capabilities.json",
+      "sha256": "3bfec579e4bf634f4ea189e430c9d1e9e7c0922ce0ca61e6e8efb97be004f45a",
+      "size_bytes": 206,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_runtime_paths.py",
+        "crg/appserver.py"
+      ]
+    },
+    {
+      "path": "protocol/schema/ClientRequest.json",
+      "sha256": "82ddf54e7ee12123f67cae77beb41bdd5399caf70c1d0fba15e5f7d5518d8cc1",
+      "size_bytes": 5998,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_foundation.py",
+        "crg/capability_probe.py",
+        "tests/unit/test_appserver.py",
+        "tests/unit/test_coordinator.py",
+        "tests/support/crash_coordinator.py",
+        "tests/unit/test_runtime_paths.py",
+        "crg/appserver.py"
+      ]
+    },
+    {
+      "path": "protocol/schema/HooksListResponse.json",
+      "sha256": "f5090a66d87e343a2b9b1e42fb33abb46673c441e21adca0339803666ff603e8",
+      "size_bytes": 192,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_foundation.py",
+        "crg/capability_probe.py"
+      ]
+    },
+    {
+      "path": "protocol/schema/ServerNotification.json",
+      "sha256": "11a4d7e6d6e6a1f88603f844560cefbc6245f94c1c416a23cb998dd92b3b7c81",
+      "size_bytes": 301,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_foundation.py",
+        "crg/capability_probe.py"
+      ]
+    },
+    {
+      "path": "protocol/schema/ThreadStartParams.json",
+      "sha256": "09450ac131d3fec061dd8a674575f714e2c98b15592ca01826b3556ac5573017",
+      "size_bytes": 738,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_foundation.py",
+        "crg/capability_probe.py"
+      ]
+    },
+    {
+      "path": "protocol/schema/ThreadTokenUsageUpdatedNotification.json",
+      "sha256": "d0b7fda88cf22ca689fe6bf9f2821ee2b6bb7bb113f5e8c9a258123e1cbaa859",
+      "size_bytes": 292,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_foundation.py",
+        "crg/capability_probe.py"
+      ]
+    },
+    {
+      "path": "protocol/schema/TurnStartParams.json",
+      "sha256": "a0e31fcd8d4a44b9c93f2154f845dcf231631fd344966671992c3cbdd126a171",
+      "size_bytes": 1145,
+      "evidence_grade": "synthetic",
+      "origin": "hand-authored public fixture; see README.md",
+      "captured_user_content": false,
+      "live_runtime_authority": false,
+      "consumers": [
+        "tests/unit/test_foundation.py",
+        "crg/capability_probe.py"
+      ]
+    }
+  ]
+}
