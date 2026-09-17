@@ -1,0 +1,22 @@
+{
+  "oneOf": [
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "thread/tokenUsage/updated"
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "thread/compacted"
+          ]
+        }
+      }
+    }
+  ]
+}

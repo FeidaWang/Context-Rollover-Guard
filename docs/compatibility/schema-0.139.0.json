@@ -1,0 +1,109 @@
+{
+  "evidence": "OFFLINE_TEST",
+  "scope": "installed-binary schema generation and model/list parameter validation only; no authentication, model or thread requests",
+  "runtime_version": "codex-cli 0.139.0",
+  "observed_date": "2026-09-17",
+  "client_request_sha256": "276c2b7c1b4435fe1722b1c8783b69b7c69c4c4f90c2f17dcbc454efce4f0887",
+  "schema": {
+    "methods": {
+      "thread/start": true,
+      "turn/start": true,
+      "thread/archive": true,
+      "config/read": true,
+      "hooks/list": true
+    },
+    "token_usage_supported": true,
+    "compaction_notifications": [
+      "thread/compacted"
+    ],
+    "hooks_supported": {
+      "stop": true,
+      "userPromptSubmit": true,
+      "preCompact": true,
+      "postCompact": true,
+      "sessionStart": true
+    },
+    "developer_instructions_supported": true,
+    "client_user_message_id_supported": true,
+    "model_context_window_schema": true,
+    "thread_start_fields": [
+      "approvalPolicy",
+      "approvalsReviewer",
+      "baseInstructions",
+      "config",
+      "cwd",
+      "developerInstructions",
+      "dynamicTools",
+      "environments",
+      "ephemeral",
+      "experimentalRawEvents",
+      "mockExperimentalField",
+      "model",
+      "modelProvider",
+      "permissions",
+      "personality",
+      "runtimeWorkspaceRoots",
+      "sandbox",
+      "serviceName",
+      "serviceTier",
+      "sessionStartSource",
+      "threadSource"
+    ],
+    "turn_start_fields": [
+      "additionalContext",
+      "approvalPolicy",
+      "approvalsReviewer",
+      "clientUserMessageId",
+      "collaborationMode",
+      "cwd",
+      "effort",
+      "environments",
+      "input",
+      "model",
+      "outputSchema",
+      "permissions",
+      "personality",
+      "responsesapiClientMetadata",
+      "runtimeWorkspaceRoots",
+      "sandboxPolicy",
+      "serviceTier",
+      "summary",
+      "threadId"
+    ]
+  },
+  "model_list_empty_params_valid": true,
+  "model_response_fields": {
+    "Model": [
+      "additionalSpeedTiers",
+      "availabilityNux",
+      "defaultReasoningEffort",
+      "defaultServiceTier",
+      "description",
+      "displayName",
+      "hidden",
+      "id",
+      "inputModalities",
+      "isDefault",
+      "model",
+      "serviceTiers",
+      "supportedReasoningEfforts",
+      "supportsPersonality",
+      "upgrade",
+      "upgradeInfo"
+    ],
+    "ModelAvailabilityNux": [
+      "message"
+    ],
+    "ModelServiceTier": [
+      "description",
+      "id",
+      "name"
+    ],
+    "ModelUpgradeInfo": [
+      "migrationMarkdown",
+      "model",
+      "modelLink",
+      "upgradeCopy"
+    ]
+  }
+}

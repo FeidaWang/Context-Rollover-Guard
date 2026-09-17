@@ -56,7 +56,7 @@ def inspect_schema(root: Path) -> dict:
     }
 
 
-def isolated_rpc(binary: str, workspace: Path) -> dict:
+def isolated_rpc(binary: str, workspace: Path, *, schema_document=None) -> dict:
     with TemporaryDirectory(prefix="crg-probe-") as tmp:
         root = Path(tmp).resolve()
         home, project = root / "home", root / "workspace"
@@ -113,10 +113,23 @@ def isolated_rpc(binary: str, workspace: Path) -> dict:
                 config = cfg.get("result", {}).get("config", {})
                 result["isolated_compact_fields"] = {k: config.get(k) for k in (
                     "model_context_window", "model_auto_compact_token_limit", "model_auto_compact_token_limit_scope")}
-                result["invalid_parameter_dispatch"] = {}
-                for i, m in enumerate(METHODS[:3], 4):
-                    reply = rpc(i, m, {"cwd": 42} if m == "thread/start" else {})
-                    result["invalid_parameter_dispatch"][m] = reply.get("error", {})
+                # Read-only catalog discovery replaces invalid mutation probes.
+                from .models import discover_models
+                from .appserver import ProtocolSchema
+                schema = ProtocolSchema.__new__(ProtocolSchema)
+                schema.document = schema_document or {}
+                schema.methods = {name: variant['properties']['params']
+                    for variant in schema.document.get('oneOf', [])
+                    for name in variant.get('properties', {}).get('method', {}).get('enum', [])
+                    if 'params' in variant.get('properties', {})}
+                sequence = 10
+                def catalog_request(method, params):
+                    nonlocal sequence
+                    sequence += 1
+                    reply = rpc(sequence, method, params)
+                    if 'result' not in reply: raise ValueError('Catalog request rejected')
+                    return reply['result']
+                result['model_catalog'] = discover_models(catalog_request, schema)
                 return result
             finally:
                 p.stdin.close()
@@ -160,8 +173,32 @@ def inventory(workspace: Path) -> dict:
             "codex_config_allowlist": config}
 
 
-def probe(workspace: Path, out: Path, binary: str = "codex", surface: str = "unknown") -> dict:
-    workspace = workspace.resolve(); out.mkdir(parents=True, exist_ok=True)
+def _write_private(path, data):
+    """Atomically replace local probe metadata without following a destination link."""
+    from .durable import private_directory, sync_directory
+    import tempfile
+    private_directory(path.parent)
+    if path.is_symlink():
+        raise ValueError('Symlink probe artifact refused')
+    fd, temporary = tempfile.mkstemp(prefix='.probe-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        sync_directory(path.parent)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def probe(workspace: Path, out: Path, binary: str = "codex", surface: str = "unknown", *, paths=None) -> dict:
+    from .durable import private_directory
+    workspace = workspace.resolve()
+    schema_destination = paths.schema_cache if paths else out/'schema'
+    receipt = paths.capability_receipt if paths else out/'capabilities.json'
+    private_directory(receipt.parent)
     result = {"generated_at": now(), "surface": surface, "selected_mode": "MODE_A", "errors": []}
     try:
         result["inventory"] = inventory(workspace)
@@ -178,25 +215,39 @@ def probe(workspace: Path, out: Path, binary: str = "codex", surface: str = "unk
                 "reason":"control_socket_missing" if "No such file or directory" in daemon.stderr
                          else "see installed daemon version command"}
 
+            schema_document = None
             with TemporaryDirectory(prefix="crg-schema-") as tmp:
                 schema=Path(tmp)
                 generated = subprocess.run([executable, "app-server", "generate-json-schema", "--experimental",
                                             "--out", str(schema)], capture_output=True, text=True, timeout=30)
                 result["schema_generation_ok"] = generated.returncode == 0
                 if generated.returncode == 0:
+                    schema_document = json.loads((schema/"ClientRequest.json").read_text())
                     result["schema"] = inspect_schema(schema)
                     result["schema_sha256"] = {str(p.relative_to(schema)): hashlib.sha256(p.read_bytes()).hexdigest()
                                                 for p in sorted(schema.rglob("*.json"))}
                     # Inspect only a fresh generated bundle, never stale files from a prior version.
-                    shutil.copytree(schema,out/"schema",dirs_exist_ok=True)
-            result["runtime"] = isolated_rpc(executable, workspace)
-        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+                    private_directory(schema_destination)
+                    for source in sorted(schema.rglob('*.json')):
+                        _write_private(schema_destination/source.relative_to(schema), source.read_bytes())
+            result["runtime"] = isolated_rpc(executable, workspace, schema_document=schema_document)
+        except (OSError, ValueError, RuntimeError, TypeError, KeyError, AttributeError, subprocess.SubprocessError) as exc:
             result["errors"].append(f"probe: {type(exc).__name__}: {exc}")
     else:
         result["errors"].append("Codex executable unavailable")
     result["selected_mode"] = select_mode(result)
-    (out / "capabilities.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
-    (out.parent / "CAPABILITY_REPORT.md").write_text(render_report(result))
+    _write_private(receipt, (json.dumps(result, ensure_ascii=False, indent=2) + "\n").encode())
+    if paths and paths.evidence_exports:
+        private_directory(paths.evidence_exports)
+        report = render_report(result)
+        for old, target in (
+            ('evidence/capabilities.json', receipt),
+            ('evidence/schema/ClientRequest.json', schema_destination/'ClientRequest.json'),
+            ('evidence/schema/v2/ThreadTokenUsageUpdatedNotification.json', schema_destination/'v2/ThreadTokenUsageUpdatedNotification.json'),
+            ('evidence/schema/v2/HooksListResponse.json', schema_destination/'v2/HooksListResponse.json'),
+        ):
+            report = report.replace(']('+old+')', ']('+os.path.relpath(target, paths.evidence_exports)+')')
+        _write_private(paths.evidence_exports / "CAPABILITY_REPORT.md", report.encode())
     return result
 
 

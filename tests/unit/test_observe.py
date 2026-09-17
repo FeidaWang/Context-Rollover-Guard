@@ -165,10 +165,10 @@ class ObserverTests(unittest.TestCase):
         self.assertEqual(len(list(read_events(path))),1)
 
 class DesktopRuntimeRegression(unittest.TestCase):
-    def test_real_01534_compaction_turn_does_not_pollute_growth(self):
-        # Actual projected wire events: 3 user turns, separate compact turn, then user turn.
+    def test_projected_compaction_turn_does_not_pollute_growth(self):
+        # Synthetic projected events: 3 user turns, separate compact turn, then user turn.
         project=Path(__file__).resolve().parents[2]
-        events=[json.loads(line) for line in (project/'docs/context-rollover/evidence/desktop-live-01/live-events.jsonl').read_text().splitlines()]
+        events=[json.loads(line) for line in (project/'tests/fixtures/compaction-events.jsonl').read_text().splitlines()]
         thread=events[0]['params']['threadId']
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary).resolve();cwd=root/'workspace';cwd.mkdir()

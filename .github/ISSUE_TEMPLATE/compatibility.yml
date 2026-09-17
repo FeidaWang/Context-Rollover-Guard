@@ -1,0 +1,40 @@
+name: Compatibility report
+description: Report a reproducible runtime or installation compatibility result.
+title: '[Compatibility] '
+body:
+  - type: markdown
+    attributes:
+      value: 'Use synthetic inputs and projected metadata. Do not upload prompts, answers, credentials, account IDs, or private journals.'
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Python version
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CRG source commit and runtime version (or no runtime)
+    validations:
+      required: true
+  - type: dropdown
+    id: evidence
+    attributes:
+      label: Evidence scope
+      options:
+        - OFFLINE_TEST
+        - LIVE_ISOLATED_TEST
+        - PRODUCTION_OBSERVATION
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction command and expected versus observed outcome
+      description: State whether clean-checkout tests passed and whether the runtime surface was owned or Desktop.
+    validations:
+      required: true
+  - type: textarea
+    id: limitations
+    attributes:
+      label: Unverified boundaries and sanitized fixture or public result link

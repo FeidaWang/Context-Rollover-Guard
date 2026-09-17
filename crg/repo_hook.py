@@ -72,7 +72,8 @@ def dispatch_repo(event,workspace,*,native_home=None):
     if name=='Stop' and state.state in {State.NORMAL.value,State.ARMED.value}:
         status='UNAVAILABLE';events=[]
         try:
-            manifest=json.loads((Path(__file__).resolve().parents[1]/'docs/context-rollover/evidence/capabilities.json').read_text())
+            from .runtime_paths import RuntimePaths
+            manifest=json.loads(RuntimePaths.resolve(workspace, config).capability_receipt.read_text())
             version=manifest['codex_version'].removeprefix('codex-cli ')
             home=Path(native_home) if native_home is not None else Path(os.environ.get('CODEX_HOME',str(Path.home()/'.codex')))
             if event.get('transcript_path'):

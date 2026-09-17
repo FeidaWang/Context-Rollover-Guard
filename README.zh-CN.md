@@ -56,7 +56,8 @@ python3 dist/context-rollover-guard/scripts/crg.pyz --help
 
 ```sh
 python3 -m unittest discover -s tests/unit -v
-python3 scripts/build_zipapp.py
+python3 scripts/build_release.py
+python3 scripts/build_release.py --verify
 ```
 
 根目录运行时只使用 Python 标准库；可选的 `pip` 打包配置位于 [`pyproject.toml`](pyproject.toml)。本地日志、交接、测试工作区和机器特定证据已刻意排除在 Git 之外。
@@ -74,3 +75,26 @@ CRG 将未知结果视为恢复工作，而不是重试授权。除非已获授�
 ## 贡献与安全问题
 
 提交变更前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请按 [SECURITY.md](SECURITY.md) 的方式私下报告。
+
+## 安全配置
+
+新检出的仓库默认禁用（`enabled = false`、`mode = "auto"`），提示词与压缩阻断均须显式开启。安装 skill 不会安装 hooks。守护功能需要显式启用及单独配置、验证的集成；`enabled` 本身不代表已激活。
+
+机器专用运行时路径放在 `$CODEX_HOME/context-rollover.toml`（默认 `~/.codex/context-rollover.toml`）的 `[context_rollover]` / `codex_binary` 中。未指定时探测通过 PATH 查找 `codex`。仓库配置覆盖用户配置，CLI 覆盖最后生效。
+
+运行 `python3.13 -m crg config --workspace .` 查看有效值及各字段的 `sources`（`default`、`user`、`repo`、`cli`）。命令只读 CRG 设置，不读取 Codex 凭据、不探测或安装运行时。`--codex PATH` 仅覆盖本次查看的路径。要求 Python 3.11+，请使用本机对应解释器。
+
+运行 `python3.13 scripts/verify_offline.py --clean` 可将当前未忽略的源码复制到临时干净 Git 检出，隔离 HOME/CODEX_HOME，并执行单元测试、CLI 集成测试、统一构建、所有产物校验，以及 skill 目录和解压 ZIP 的双重自测。验证期间拒绝网络及真实运行时启动。CI 配置覆盖 Linux/macOS 的 Python 3.11–3.13；使用 `--clean` 时构建发生在临时检出中，不修改工作区产物；运行 `python3 scripts/build_release.py` 可统一更新工作区发布产物。
+
+## 运行时路径与诊断
+
+对于尚无 `crg.toml` 的工作区，`python3.13 -m crg init --workspace /项目路径` 只创建默认禁用的配置，拒绝覆盖已有文件。`python3.13 -m crg doctor --workspace /项目路径` 默认输出 JSON，加上 `--format human` 可显示简明文本。普通诊断只读；没有新证据时，hooks 信任、遥测可用性和已启用会话的实际激活状态保持未知。
+
+缓存及凭据目录默认位于配置的 state root 下，不再依赖源码检出目录。已有证据需要显式配置路径，仍可使用 `doctor --evidence PATH`。修改现有集成前请阅读 [CRG-0103 路径、状态语义与迁移说明](docs/implementation/CRG-0103-RESULTS.md)。`doctor --probe` 会显式调用隔离运行时探测，不属于安装或普通查看操作。
+
+安装及对应卸载/回退步骤见[贡献者快速指南](docs/CONTRIBUTOR-QUICKSTART.md)。保留未确认的恢复日志；移除 skill 不等于卸载独立配置的 hooks。
+
+
+### M4 离线实验
+
+新增 `statistical-audit`、`resolve-model` 和供测试适配器使用的重置事务引擎，详见 [M4 契约说明](docs/metrics/EXPERIMENTAL-M4.md)。这些实现不会启用高级策略或实际兑换重置额度。[CRG-0301～0401 验收报告](docs/implementation/CRG-0301-0401-RESULTS.md) 区分了已通过的离线测试与尚缺的真实数据、运行时及 Windows/附件证据；整批任务尚未满足上线验收条件。

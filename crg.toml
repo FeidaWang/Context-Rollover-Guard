@@ -1,7 +1,6 @@
 [context_rollover]
-enabled = true
-mode = "MODE_B"
-codex_binary = "/Applications/ChatGPT.app/Contents/Resources/codex"
+enabled = false
+mode = "auto"
 archive_root = ".codex/context-archive"
 state_root = ".crg-state"
 
@@ -23,5 +22,5 @@ preserve_permissions = true
 forward_original_prompt = true
 
 [emergency]
-block_auto_compact = true
-force_rollover_on_next_prompt = true
+block_auto_compact = false
+force_rollover_on_next_prompt = false

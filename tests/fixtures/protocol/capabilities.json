@@ -1,0 +1,7 @@
+{
+  "codex_version": "synthetic-offline-v1",
+  "binary": "crg-fixture-not-a-runtime",
+  "schema_sha256": {
+    "ClientRequest.json": "82ddf54e7ee12123f67cae77beb41bdd5399caf70c1d0fba15e5f7d5518d8cc1"
+  }
+}

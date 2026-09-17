@@ -1,0 +1,1085 @@
+diff --git a/docs/implementation/00-START-HERE.md b/docs/implementation/00-START-HERE.md
+new file mode 100644
+index 0000000..91feb85
+--- /dev/null
++++ b/docs/implementation/00-START-HERE.md
+@@ -0,0 +1,35 @@
++# Context Rollover Guard — Implementation Entry Point
++
++Baseline reviewed: `8079b5c3e87b0e74d79f56c3c3236060fc62cdc6`
++
++Use this document set as an execution package for Codex. Treat every task as an implementation contract, not as a product claim. Do not claim a feature is supported until the corresponding acceptance gate passes on a clean checkout.
++
++## Read in this order
++
++1. `01-ROADMAP.md` — product direction, release gates, OSS growth strategy, and Codex-for-OSS evidence plan.
++2. `02-TECHNICAL-IMPLEMENTATION.md` — implementation tickets with files, changes, invariants, tests, and acceptance criteria.
++3. `03-AUDIT-AND-SOURCES.md` — repository audit scope, evidence levels, assumptions, and source references.
++
++## Mandatory execution rules
++
++- Re-read `main` before starting a ticket. If the target code changed, update the ticket implementation notes before editing code.
++- Change one contract per pull request whenever practical. Do not combine state-machine changes, packaging changes, accounting semantics, and model-selection changes in one PR.
++- Preserve the existing fail-closed behavior: ambiguous mutation acceptance MUST NOT cause an automatic retry.
++- Do not hardcode model capabilities from model names. Discover capabilities from the installed runtime and generated schema.
++- Keep raw prompts, answers, credentials, and account identifiers out of public fixtures and telemetry exports.
++- Every new metric MUST define scope, source, time basis, reset semantics, and unknown-state behavior.
++- Every user-visible estimate MUST expose uncertainty and sample count. Unknown data MUST stay unknown; never silently replace it with zero.
++- New recommendation logic MUST default to zero additional model calls. Local computation, file I/O, and account reads are still real costs and must not be described as “zero cost.”
++
++## First execution batch
++
++Implement only these first:
++
++- `CRG-0101` Safe defaults and platform-neutral configuration.
++- `CRG-0102` Clean-checkout fixtures and CI.
++
++Do not start quota redemption, advanced statistical learning, or automatic model switching before these two gates pass.
++
++## Suggested execution model
++
++Use the highest-capability coding model available in the current runtime for the P0 compatibility and state-safety work. Prefer Astra with High reasoning when available. Do not select Ultra/Extra-High by default unless the task contains independent parallel work or repeated deep debugging that justifies the higher cost.
+diff --git a/docs/implementation/01-ROADMAP.md b/docs/implementation/01-ROADMAP.md
+new file mode 100644
+index 0000000..df3e6ee
+--- /dev/null
++++ b/docs/implementation/01-ROADMAP.md
+@@ -0,0 +1,280 @@
++# Context Rollover Guard — Actionable Product and OSS Roadmap
++
++Review baseline: `8079b5c3e87b0e74d79f56c3c3236060fc62cdc6`
++
++## 1. Product direction
++
++Preserve CRG's strongest asset: fail-closed continuity and recovery. Reposition the project from “prevent compaction and force a new task” to:
++
++> **Local-first continuity, trustworthy usage accounting, and low-overhead next-task advice for Codex.**
++
++Implement a **native-first** policy. Native continuation mechanisms remain the default path when they are available and healthy. CRG should intervene only when the user explicitly requests a fresh task, when a verified compatibility condition requires migration, or when recovery is necessary.
++
++Do not make “context compaction happened” equivalent to “CRG failed.” The product should measure whether work remains correct, recoverable, and efficient across context boundaries.
++
++## 2. Primary success objective
++
++Optimize implementation order for these outcomes, in this order:
++
++1. A clean checkout can be tested by an external maintainer without private machine evidence.
++2. Installation and failure modes are understandable and reversible.
++3. CRG coexists with native continuation instead of competing with it by default.
++4. Usage and quota data is auditable and correctly scoped.
++5. Recommendation and ETA logic improves through local history without a background agent.
++6. The repository has enough public evidence to support a credible Codex-for-OSS application.
++
++Stars, forks, and downloads are supporting evidence only. Do not manufacture activity or optimize the project around vanity metrics.
++
++## 3. Release gates
++
++### M0 — Reproducible foundation (`v0.1.1` target)
++
++Implement `CRG-0101` through `CRG-0104`.
++
++Required deliverables:
++
++- Safe repository defaults.
++- Public protocol fixtures that replace author-machine evidence in unit tests.
++- CI that runs on a clean checkout.
++- Explicit runtime paths and a `doctor` output that separates configured, available, verified, and active states.
++- One build command that produces every distributable artifact from the same source tree.
++
++Exit criteria:
++
++- `python -m unittest discover -s tests/unit -v` runs without requiring ignored private evidence.
++- Offline self-test runs without Codex authentication or live model usage.
++- Importing the package creates no hooks, threads, archives, or background services.
++- Missing live evidence causes an explicit `UNKNOWN` or `UNVERIFIED` result, not a false success.
++- All generated artifacts contain the same package version and manifest hash set.
++
++### M1 — Native-first continuity (`v0.2.0` target)
++
++Implement `CRG-0105` through `CRG-0107`.
++
++Required deliverables:
++
++- Runtime capability discovery from generated schema plus `model/list` or the current equivalent.
++- Separation of transport ownership from guard policy.
++- Native-first continuation policy.
++- Quiet-point checks before source-thread archival.
++- Instruction-preserving handoff manifests.
++
++Exit criteria:
++
++- CRG does not automatically replace a native continuation path that has not failed.
++- Active tools or child tasks prevent automatic archival when completion cannot be proven.
++- Handoff data never becomes higher-authority developer instructions merely because it was archived.
++- Unknown model capabilities degrade to observation-only behavior.
++
++### M2 — Usage ledger and decision assistance (`v0.3.0` target)
++
++Implement `CRG-0201` through `CRG-0205`.
++
++Required deliverables:
++
++- Durable local event ledger.
++- Optional official account-usage/rate-limit snapshots when the runtime exposes them.
++- Quota epochs that survive reset events without deleting historical consumption.
++- Rule-based model/effort recommendation with zero default additional inference calls.
++- ETA intervals with sample counts and stale-data detection.
++- A compact recommendation footer/status surface.
++
++Exit criteria:
++
++- Local usage, account usage, active context, and rate-limit windows are never merged into one number.
++- Reset events start a new quota epoch while preserving historical usage.
++- Remaining percentage is not converted into a fixed token balance unless an authoritative token denominator exists.
++- ETA uses completed observations only; timeouts/cancellations are marked as censored or incomplete.
++- Recommendation failure never blocks task execution.
++
++### M3 — Public evidence and OSS application
++
++Implement `CRG-0206` through `CRG-0208` in parallel with M2.
++
++Required deliverables:
++
++- Continuity benchmark comparing native-first, guarded handoff, and recovery paths.
++- Public compatibility matrix.
++- At least one externally reproducible user or maintainer report.
++- A bounded API-credit budget plan tied to open-source maintenance outcomes.
++- Codex-for-OSS application text backed by repository evidence.
++
++Exit criteria:
++
++- Benchmark failures are published, not filtered out.
++- Every adoption claim links to public evidence or is explicitly labeled anecdotal.
++- Application text does not claim guaranteed eligibility or invent usage metrics.
++
++### M4 — Statistical calibration and optional automation (`v0.4.0+`)
++
++Implement `CRG-0301` through `CRG-0304` only after M2/M3 produce sufficient data.
++
++Required deliverables:
++
++- Shrinkage or hierarchical estimates across sparse task/model cells.
++- Drift detection and interval recalibration.
++- Optional reset redemption with explicit user authorization and read-back verification.
++- Attachment/Windows support only when backed by real demand and tests.
++
++Exit criteria:
++
++- Advanced methods beat simple baselines on a time-split evaluation without reducing safety.
++- No automatic spending action occurs without explicit authorization.
++- Any model-family adapter is discovered from runtime evidence, not from a guessed future model ID.
++
++## 4. Priority backlog
++
++| ID | Priority | Deliverable | Depends on | Acceptance focus |
++|---|---|---|---|---|
++| CRG-0101 | P0 | Safe defaults and truthful platform behavior | — | No implicit production action from clone/import/self-test |
++| CRG-0102 | P0 | Public fixtures and clean CI | 0101 | Unit tests do not require private evidence |
++| CRG-0103 | P0 | RuntimePaths, init, doctor | 0101 | Configured/available/verified/active are distinct |
++| CRG-0104 | P0 | Unified reproducible build | 0102 | Source, pyz, skill ZIP, manifests agree |
++| CRG-0105 | P0 | Capability/model discovery | 0102,0103 | Dynamic schema and effort support; unknown degrades safely |
++| CRG-0106 | P0 | Native-first continuity and quiet points | 0105 | No premature migration or archival |
++| CRG-0107 | P0 | Instruction-preserving handoff contract | 0106 | No privilege escalation from archived content |
++| CRG-0201 | P1 | Durable usage/event ledger | 0103,0105 | Deduplication, provenance, scope separation |
++| CRG-0202 | P1 | Account snapshots and quota epochs | 0201 | Reset without history loss; no fake token denominator |
++| CRG-0203 | P1 | Rule-based model/effort advisor | 0105,0201 | Capability filtering and explainable choices |
++| CRG-0204 | P1 | ETA prediction and online updates | 0201,0203 | Pre-result prediction, censored outcomes, uncertainty |
++| CRG-0205 | P1 | Compact advice/status renderer | 0103,0203,0204 | Separate renderer from preserved answer text |
++| CRG-0206 | P1 | Continuity/cost benchmark | 0106,0201 | Compare against native baseline |
++| CRG-0207 | P1 | Contributor onboarding and demos | 0104,0205 | External maintainer can install/test/recover |
++| CRG-0208 | P1 | Codex-for-OSS evidence package | 0206,0207 | Claims are sourced and bounded |
++| CRG-0301 | P2 | Quality-constrained selector | 0203,0206 | No false counterfactual claims |
++| CRG-0302 | P2 | Drift and interval calibration | 0204,0206 | Coverage tracked by group and time |
++| CRG-0303 | P2 | Explicit reset redemption | 0202 | User authorization, idempotent intent, read-back |
++| CRG-0304 | P2 | Attachments/Windows adapters | External demand | Preserve exactness and safety invariants |
++| CRG-0401 | P3 | Future model-family adapter | Official/runtime availability | No guessed IDs or static capabilities |
++
++## 5. User-facing product rules
++
++Implement these rules before adding richer UI:
++
++- Default install mode is observe-only.
++- Guarding must be explicit and reversible.
++- Display source and freshness for every usage/quota number.
++- Display `unknown` when coverage is incomplete.
++- Never show a precise “tokens remaining” number from a percentage-only rate limit.
++- Never hide that multiple devices or cloud tasks may be outside local coverage.
++- Preserve the original answer separately from recommendation UI.
++- Give the user the final decision on model and reasoning effort.
++
++## 6. Model and effort policy
++
++Do not maintain a hardcoded “Astra > Sol > Luna” decision table in production code. Implement a two-stage selector:
++
++1. **Capability filter** — only consider models and efforts reported as available by the current runtime/account/workspace.
++2. **Local policy** — choose the lowest-cost configuration that satisfies task-risk requirements and historical quality constraints.
++
++Cold-start policy:
++
++- Safety-critical state/recovery/compatibility changes: highest-capability coding model available; prefer Astra + High when available.
++- Medium implementation work with bounded files and tests: capable general coding model + Medium/High.
++- Mechanical docs, formatting, or deterministic test updates: lower-cost model when capability is sufficient.
++- Ultra/Extra-High: opt in only when the task contains deep multi-file reasoning, repeated failed debugging, or independent parallel subproblems.
++
++If a future `GPT-6 Sol` appears, add it only after runtime discovery and compatibility tests. Never pre-create a production identifier based on naming expectations.
++
++## 7. Low-overhead continuous learning target
++
++Implement local learning as an event-driven update, not a background agent:
++
++```text
++before task -> save prediction and selected configuration
++on completion -> save observed duration/usage/outcome
++score prior prediction -> update bounded local statistics
++on next task -> compute recommendation from stored statistics
++```
++
++No background model call is required. Use constant-time or bounded-window updates. Store enough data to audit the recommendation.
++
++Initial statistics:
++
++- Exponentially weighted mean for stable central tendency.
++- Robust median/MAD or quantile sketch for heavy-tailed duration and token usage.
++- Beta-Binomial style success-rate smoothing for sparse quality outcomes.
++- Recency decay or rolling windows for model/runtime drift.
++- Prediction intervals rather than point guarantees.
++
++Do not call this an RSI. If an RSI-like display is desired, expose a bounded **efficiency pressure index** derived from normalized recent usage, duration, and remaining quota, while keeping the underlying components visible. The index must not replace raw metrics.
++
++## 8. Codex-for-OSS preparation
++
++Build an evidence folder that contains:
++
++- Repository purpose and architecture summary.
++- Reproducible test commands.
++- Compatibility matrix.
++- External maintainer report(s).
++- Benchmark results with methodology.
++- Security and privacy boundaries.
++- Exact API-credit usage plan.
++- Links to releases/issues/PRs demonstrating ongoing maintenance.
++
++Suggested API-credit allocation for the application narrative:
++
++- 40% representative maintenance-task comparisons.
++- 30% recovery and cross-model compatibility validation.
++- 20% real project maintenance, PR review, and release validation.
++- 10% reruns and version-change reserve.
++
++Calculate requested credits only after a pilot:
++
++```text
++requested_budget = preregistered_tasks
++                 * configurations_per_task
++                 * repetitions
++                 * median_observed_cost
++                 * reserve_factor
++```
++
++Do not estimate the budget from one flat token price when input, output, cached, service-tier, or model pricing differ.
++
++## 9. Community growth plan
++
++Prioritize useful contributor entry points:
++
++- Add or sanitize a protocol fixture.
++- Add a timezone/reset regression test.
++- Validate one installation path.
++- Improve one failure message.
++- Reproduce one runtime compatibility case.
++
++Create demonstrations for:
++
++1. Recovery after acceptance-receipt loss without replay.
++2. Native continuation working while CRG stays out of the way.
++3. Quota reset creating a new epoch without erasing historical consumption.
++
++Measure:
++
++- clean-install success rate;
++- time to first useful result;
++- number of externally verified environments;
++- recovery correctness;
++- duplicate-submission incidents;
++- prediction interval coverage;
++- fraction of observations marked unknown/incomplete.
++
++Do not optimize only for stars.
++
++## 10. First Codex execution prompt
++
++Use this prompt for the first implementation batch:
++
++```text
++Work in FeidaWang/Context-Rollover-Guard.
++Read docs/implementation/00-START-HERE.md, 01-ROADMAP.md, and 02-TECHNICAL-IMPLEMENTATION.md.
++Implement only CRG-0101 and CRG-0102.
++
++Constraints:
++- Preserve fail-closed mutation handling.
++- Do not add background services or automatic model calls.
++- Do not depend on ignored machine-specific evidence for unit tests.
++- Keep the public default observe-only and platform-neutral.
++- Add tests before changing behavior when practical.
++- Run the full clean-checkout unit suite and offline self-test.
++- Report changed files, test results, unresolved runtime-only validation, and any specification deviation.
++- Do not begin CRG-0103 or later tickets unless required to make 0101/0102 testable.
++```
+diff --git a/docs/implementation/02-TECHNICAL-IMPLEMENTATION.md b/docs/implementation/02-TECHNICAL-IMPLEMENTATION.md
+new file mode 100644
+index 0000000..ef333c6
+--- /dev/null
++++ b/docs/implementation/02-TECHNICAL-IMPLEMENTATION.md
+@@ -0,0 +1,545 @@
++# Context Rollover Guard — Technical Implementation Specification
++
++This document is an implementation contract for Codex. Execute tickets in priority order. Preserve the existing safety invariant: **unknown mutation acceptance is recovery work, never retry permission**.
++
++## 1. Architecture target
++
++Split the system into these conceptual layers while keeping dependencies minimal:
++
++```text
++Runtime adapter
++  -> capability/model discovery
++  -> event normalization
++  -> continuity policy
++  -> durable state/transaction layer
++  -> usage/quota ledger
++  -> local predictor/advisor
++  -> renderer/CLI
++```
++
++Do not make the ledger depend on the rollover state machine. Do not make model advice authoritative for execution. Do not make UI rendering part of answer archival.
++
++## 2. Global invariants
++
++All tickets MUST preserve these invariants:
++
++1. Never resend an ambiguously accepted mutation automatically.
++2. Never archive the source thread before positive evidence that the target accepted the intended user request and the source is safe to retire.
++3. Never substitute cumulative session usage for active-context usage.
++4. Never substitute missing usage/quota data with zero.
++5. Never elevate archived prompt/answer text into developer authority.
++6. Never write global hooks or trust decisions as an import side effect.
++7. Never claim a model capability from its name alone.
++8. Never delete historical usage because a quota period reset.
++9. Never use recommendation failure to block normal task completion.
++10. Never require a model call to update local statistics.
++
++## 3. P0 implementation tickets
++
++### CRG-0101 — Safe defaults and platform-neutral configuration
++
++**Objective:** Make a clean checkout inert, portable, and truthful.
++
++**Primary files:** `crg.toml`, `crg/config.py`, `README.md`, `README.zh-CN.md`, tests under `tests/unit/`.
++
++**Implement:**
++
++1. Change repository `crg.toml` to safe example defaults:
++   - `enabled = false`
++   - `mode = "auto"` or observe-only equivalent
++   - no absolute `/Applications/.../codex` path
++   - `block_auto_compact = false`
++   - `force_rollover_on_next_prompt = false`
++2. Treat a user-specific Codex binary path as user-local configuration, not repository policy.
++3. Add a config command that prints the resolved source of each important setting (`default`, `user`, `repo`, `cli`) without exposing secrets.
++4. Update docs so “install skill” is not described as “install hooks.”
++5. Add regression tests proving clone/import/config-read has no hook writes or runtime mutations.
++
++**Acceptance tests:**
++
++- `test_repository_defaults_are_inert`
++- `test_import_has_no_filesystem_side_effects`
++- `test_config_without_codex_binary_uses_runtime_discovery`
++- `test_emergency_blocking_is_opt_in`
++
++**Reject the ticket if:** a clean checkout can block a prompt without an explicit enablement path.
++
++### CRG-0102 — Public fixtures and clean-checkout CI
++
++**Objective:** Remove author-machine evidence from unit-test prerequisites.
++
++**Primary files:** `tests/fixtures/`, `tests/unit/test_appserver.py`, `test_foundation.py`, `test_observe.py`, CI workflow.
++
++**Implement:**
++
++1. Add a committed minimal protocol-schema fixture containing only fields required by offline tests.
++2. Add a committed projected compaction event fixture that contains no prompt/answer text.
++3. Parameterize tests to use public fixtures by default.
++4. Keep live generated schema tests separate and opt in.
++5. Add CI for Python 3.11, 3.12, and 3.13 on Linux; add macOS if budget permits.
++6. CI MUST run:
++   - unit suite;
++   - offline CLI integration test;
++   - packaged self-test after build;
++   - a check that ignored evidence paths are not required.
++
++**Acceptance tests:**
++
++- Create a temporary clean checkout with no `docs/context-rollover/evidence` and run all offline tests.
++- Assert no network/model request is made in offline CI.
++- Assert fixtures contain no credential-like strings or raw private transcript text.
++
++### CRG-0103 — RuntimePaths and doctor state model
++
++**Objective:** Eliminate hardcoded evidence path assumptions and make state understandable.
++
++**Primary files:** new `crg/runtime_paths.py`, `crg/cli.py`, `crg/capability_probe.py`, `crg/repo_hook.py`, `crg/owned_client.py`.
++
++**Implement:**
++
++Define `RuntimePaths` with explicit locations for:
++
++- CRG state root;
++- archive root;
++- generated runtime schema cache;
++- capability receipts;
++- hook installation receipts;
++- optional benchmark/evidence exports.
++
++Add status dimensions:
++
++```text
++configured: bool
++runtime_available: bool
++schema_verified: bool
++hooks_discovered: bool
++hooks_trusted: bool | null
++telemetry_available: bool | null
++guard_enabled: bool
++guard_active_for_session: bool | null
++```
++
++Do not collapse these into one `production_enabled` boolean.
++
++`crg doctor` MUST return both machine-readable JSON and concise human output.
++
++### CRG-0104 — Unified reproducible build
++
++**Objective:** Ensure every distributed artifact is built from one source state.
++
++**Primary files:** replace/extend `scripts/build_zipapp.py`, add `scripts/build_release.py`, packaging tests.
++
++**Implement:**
++
++1. Recursively include the complete `crg` package.
++2. Build top-level `dist/crg.pyz`.
++3. Copy the same bytes into the skill package runtime location.
++4. Rebuild the skill ZIP.
++5. Generate manifests after artifacts exist.
++6. Record source commit, package version, Python compatibility, artifact SHA-256, and generated timestamp.
++7. Never require Python 3.13 if project metadata claims `>=3.11`; use a portable shebang or invoke via `python` in docs.
++8. Add a verification command that fails if artifact package versions or hashes disagree.
++
++## 4. P0 continuity tickets
++
++### CRG-0105 — Capability and model discovery
++
++**Objective:** Make compatibility runtime-driven.
++
++**Primary files:** `crg/capability_probe.py`, `crg/appserver.py`, new `crg/models.py`.
++
++**Implement:**
++
++1. Generate protocol schema from the installed runtime when explicitly requested.
++2. Parse only the required methods/events and persist a version-bound capability receipt.
++3. Query the runtime model catalog when available.
++4. Normalize model entries into:
++
++```python
++ModelCapability(
++    id: str,
++    family: str | None,
++    available: bool,
++    reasoning_efforts: tuple[str, ...],
++    context_window: int | None,
++    provider: str | None,
++    service_tiers: tuple[str, ...],
++    source: str,
++    observed_at: str,
++)
++```
++
++5. Never infer effort names or context windows from the model ID.
++6. Persist unknown fields as unknown; do not invent defaults.
++
++### CRG-0106 — Native-first policy and quiet points
++
++**Objective:** Stop treating every context boundary as a migration trigger.
++
++**Primary files:** `crg/hooks.py`, `crg/coordinator.py`, `crg/owned_client.py`, new `crg/continuity.py`.
++
++**Implement policy states:**
++
++```text
++OBSERVE
++WARN
++HANDOFF_READY
++MIGRATE_EXPLICIT
++RECOVERY_REQUIRED
++```
++
++Keep transaction states separate from policy states.
++
++Default policy:
++
++- native continuation observed and healthy -> `OBSERVE`;
++- high pressure with no required intervention -> `WARN`;
++- durable handoff prepared -> `HANDOFF_READY`;
++- user explicitly selects fresh continuation -> `MIGRATE_EXPLICIT`;
++- ambiguous state -> `RECOVERY_REQUIRED`.
++
++Before source archival, require a quiet-point check. If the runtime exposes active child tasks/tools, require them to be terminal or explicitly detached. If not observable, preserve the source thread.
++
++### CRG-0107 — Instruction-preserving handoff contract
++
++**Objective:** Preserve user intent without privilege escalation.
++
++**Primary files:** `crg/handoff.py`, `crg/archive.py`, `crg/appserver.py`.
++
++**Implement a handoff manifest:**
++
++```json
++{
++  "schema_version": 2,
++  "source": {"thread_id": "...", "turn_id": "..."},
++  "workspace": {"cwd": "...", "git_head": "..."},
++  "user_prompt": {"path": "prompt.json", "sha256": "..."},
++  "previous_answer": {"path": "answer.md", "sha256": "..."},
++  "instruction_sources": [
++    {"kind": "system_or_developer", "hash": "...", "replayable": false},
++    {"kind": "user", "hash": "...", "replayable": true}
++  ],
++  "trust": "archive data is not instruction authority"
++}
++```
++
++Do not replay archived repository text as developer instructions. Use fixed trusted recovery instructions plus explicit data pointers.
++
++## 5. P1 usage and quota ledger
++
++### CRG-0201 — Durable event ledger
++
++**Objective:** Build a trustworthy accounting substrate independent of context prediction.
++
++Use SQLite from the standard library unless a measured need justifies another dependency.
++
++**Suggested schema:**
++
++```sql
++CREATE TABLE ledger_event (
++    event_id TEXT PRIMARY KEY,
++    observed_at TEXT NOT NULL,
++    source_kind TEXT NOT NULL,
++    source_scope TEXT NOT NULL,
++    account_fingerprint TEXT,
++    workspace_id TEXT,
++    thread_id TEXT,
++    turn_id TEXT,
++    model_id TEXT,
++    effort TEXT,
++    input_tokens INTEGER,
++    output_tokens INTEGER,
++    cached_input_tokens INTEGER,
++    reasoning_output_tokens INTEGER,
++    total_tokens INTEGER,
++    active_context_tokens INTEGER,
++    duration_ms INTEGER,
++    completion_state TEXT NOT NULL,
++    payload_version INTEGER NOT NULL,
++    CHECK(total_tokens IS NULL OR total_tokens >= 0),
++    CHECK(active_context_tokens IS NULL OR active_context_tokens >= 0)
++);
++
++CREATE INDEX idx_ledger_time ON ledger_event(observed_at);
++CREATE INDEX idx_ledger_model ON ledger_event(model_id, effort, observed_at);
++```
++
++**Rules:**
++
++- Event IDs must be deterministic when source identity supports it.
++- Duplicate replay is idempotent.
++- Store projected counters, not raw prompt/answer content.
++- `active_context_tokens` is never summed into weekly consumption.
++- `total_tokens` MUST have source semantics documented. If it is a cumulative counter, store the raw observation separately and derive deltas with reset detection.
++
++### CRG-0202 — Official account snapshots and quota epochs
++
++**Objective:** Track account/rate-limit state without pretending it is the same as token consumption.
++
++Suggested tables:
++
++```sql
++CREATE TABLE quota_snapshot (
++    snapshot_id TEXT PRIMARY KEY,
++    observed_at TEXT NOT NULL,
++    source TEXT NOT NULL,
++    account_fingerprint TEXT,
++    bucket_id TEXT NOT NULL,
++    used_percent REAL,
++    remaining_percent REAL,
++    reset_at TEXT,
++    window_seconds INTEGER,
++    raw_limit_units REAL,
++    unit_name TEXT,
++    freshness_seconds INTEGER,
++    CHECK(used_percent IS NULL OR (used_percent >= 0 AND used_percent <= 100)),
++    CHECK(remaining_percent IS NULL OR (remaining_percent >= 0 AND remaining_percent <= 100))
++);
++
++CREATE TABLE quota_epoch (
++    epoch_id TEXT PRIMARY KEY,
++    bucket_id TEXT NOT NULL,
++    started_at TEXT NOT NULL,
++    reset_reason TEXT NOT NULL,
++    previous_epoch_id TEXT,
++    confidence TEXT NOT NULL
++);
++```
++
++**Reset detection order:**
++
++1. Authoritative reset event/read-back.
++2. Reset timestamp crossed plus a materially lower official used percentage.
++3. User-declared reset with explicit `USER_CONFIRMED` confidence.
++4. Otherwise do not reset the epoch.
++
++Do not erase ledger events. Do not use rumor/community reset timing as authoritative evidence.
++
++### CRG-0203 — Rule-based model and effort advisor
++
++**Objective:** Recommend a configuration using runtime capability plus local history.
++
++Define task features without another model call where possible:
++
++```text
++files_touched_estimate
++has_state_machine_change
++has_protocol_change
++has_security_boundary_change
++has_test_failure
++requires_live_runtime
++is_docs_only
++estimated_parallelizable_units
++```
++
++Rule pipeline:
++
++1. Filter unavailable models/efforts.
++2. Apply hard safety floor for protocol/state/security work.
++3. Read recent local quality/cost/duration statistics.
++4. Choose the least expensive candidate satisfying the quality floor.
++5. Emit recommendation + alternatives + reason + confidence.
++
++Never auto-switch a user's selected model unless the user explicitly enables that behavior in a future feature.
++
++### CRG-0204 — ETA and online calibration
++
++**Objective:** Predict completion time and usage without a persistent agent.
++
++Record prediction **before** execution:
++
++```json
++{
++  "prediction_id": "...",
++  "task_class": "protocol_change",
++  "model_id": "...",
++  "effort": "high",
++  "predicted_duration_p50_ms": 420000,
++  "predicted_duration_p80_ms": 780000,
++  "predicted_total_tokens_p50": 65000,
++  "sample_count": 14,
++  "created_at": "..."
++}
++```
++
++On completion, join the result to the prediction and update bounded statistics.
++
++**Initial algorithms:**
++
++- Duration: log-duration EWMA plus robust quantiles.
++- Token use: median + P75/P90 within task/model/effort cell.
++- Sparse cells: back off `task+model+effort -> task+model -> task -> global`.
++- Quality: Beta prior over explicit success labels.
++- Drift: compare recent-window median to long-window median; invalidate or widen intervals when drift exceeds a configured threshold.
++
++**Censored observations:** timeout, cancellation, user interruption, and superseded plan are not completed durations. Record them with status and do not train point-completion estimates as if they had finished at the cutoff.
++
++### CRG-0205 — Advice renderer
++
++**Objective:** Provide one compact line without modifying archived answer text.
++
++For owned clients, render after the answer and before the final conclusion section only if the renderer controls the complete output structure. Otherwise render as a separate status line.
++
++Recommended format:
++
++```text
++CRG next-task estimate — model: Astra | effort: High | ETA: 8–14 min | confidence: medium | samples: 11
++```
++
++If data is insufficient:
++
++```text
++CRG next-task estimate — model: highest verified coding capability | effort: High | ETA: unknown (insufficient local history)
++```
++
++The renderer MUST NOT trigger another inference call.
++
++## 6. P1 benchmark and OSS evidence
++
++### CRG-0206 — Continuity and cost benchmark
++
++Create deterministic benchmark definitions with fixture IDs and result manifests.
++
++Compare:
++
++- native continuation only;
++- CRG observe-only;
++- explicit CRG fresh-task handoff;
++- recovery after ambiguous receipt loss.
++
++Measure:
++
++- final task correctness;
++- exact prompt preservation;
++- duplicate mutation count;
++- elapsed time;
++- model usage where authoritative;
++- context resets/compactions;
++- recovery success;
++- source thread retention.
++
++Do not compare only against old CRG behavior.
++
++### CRG-0207 — Contributor onboarding
++
++Add:
++
++- `docs/CONTRIBUTOR-QUICKSTART.md`;
++- issue templates for compatibility reports;
++- sanitized fixture contribution guide;
++- one-command offline verification;
++- uninstall/revert instructions next to install instructions.
++
++### CRG-0208 — Codex-for-OSS evidence package
++
++Create `docs/oss-application/` with:
++
++- `PROJECT-SUMMARY.md`
++- `EVIDENCE.md`
++- `API-CREDIT-PLAN.md`
++- `MAINTENANCE-PLAN.md`
++- `APPLICATION-DRAFT.md`
++
++Every quantitative claim MUST link to a public issue, PR, release, benchmark artifact, or repository statistic captured with a date.
++
++## 7. P2 statistical improvements
++
++### CRG-0301 — Quality-constrained selector
++
++Only implement after enough observations exist.
++
++Use observed outcomes, not predicted counterfactual labels. A model that was not chosen has no real outcome for that task.
++
++Candidate objective:
++
++```text
++min expected_cost
++subject to lower_confidence_bound(success_rate) >= quality_floor
++           and p80_duration <= user_latency_budget (if specified)
++```
++
++Back off to a simpler policy when sample size is low.
++
++### CRG-0302 — Drift and interval calibration
++
++Track empirical coverage of ETA/token intervals by task class and runtime version.
++
++Widen or reset estimators when:
++
++- runtime version changes;
++- model capability metadata changes;
++- median error shifts materially;
++- quota policy changes;
++- enough recent misses accumulate.
++
++Conformal-style methods may be evaluated, but do not claim mathematical coverage guarantees unless assumptions and tests support them.
++
++### CRG-0303 — Explicit reset redemption
++
++Treat redemption as a transaction:
++
++```text
++prepare intent -> show exact effect/cost -> user approves -> submit once -> persist receipt -> read back quota state
++```
++
++On ambiguous acceptance, reconcile via read-only state. Never retry redemption blindly.
++
++## 8. Testing matrix
++
++Every release gate should include these categories:
++
++- clean checkout;
++- package import side effects;
++- duplicate event replay;
++- process crash between intent and receipt;
++- corrupted state/backup;
++- missing runtime/schema;
++- runtime schema drift;
++- unknown model effort;
++- Unicode and empty prompt/answer;
++- concurrent writers;
++- quota reset and timezone boundary;
++- account switch;
++- stale snapshot;
++- multiple quota windows;
++- timeout/cancelled ETA observation;
++- model recommendation with no history;
++- recommendation with stale history;
++- child-task active during archival decision;
++- handoff injection attempt;
++- build artifact hash mismatch.
++
++## 9. Migration strategy
++
++Do not delete MODE_A/B/C immediately.
++
++Release 1:
++
++- Map old modes to new policy concepts.
++- Print a deprecation warning in `doctor`, not on every normal command.
++- Preserve old config parsing.
++
++Release 2:
++
++- Generate a migration suggestion.
++- Refuse only truly ambiguous combinations.
++
++Release 3 or later:
++
++- Remove deprecated names only after one stable release with migration tooling.
++
++State schema upgrades MUST remain forward-safe. A future unknown schema must fail closed, as the current store already does.
++
++## 10. Definition of done for each ticket
++
++A ticket is not complete until all are true:
++
++- code implemented;
++- unit tests added/updated;
++- offline tests pass on clean checkout;
++- relevant live validation is either passed or explicitly marked pending;
++- docs updated;
++- no raw private evidence committed;
++- release notes explain behavior change;
++- acceptance criteria from this document are checked off;
++- deviations are documented with rationale.
+diff --git a/docs/implementation/03-AUDIT-AND-SOURCES.md b/docs/implementation/03-AUDIT-AND-SOURCES.md
+new file mode 100644
+index 0000000..5c4e39e
+--- /dev/null
++++ b/docs/implementation/03-AUDIT-AND-SOURCES.md
+@@ -0,0 +1,201 @@
++# Context Rollover Guard — Audit Scope and Evidence Guide
++
++Review date: 2026-09-17
++
++Repository baseline:
++
++```text
++repository: FeidaWang/Context-Rollover-Guard
++main:       8079b5c3e87b0e74d79f56c3c3236060fc62cdc6
++initial:    9475d17cf10a9950932b10c4f5de65c2d6bfe61b
++```
++
++Use this file to keep implementation claims honest. When a later commit changes relevant code, update the audit baseline before using an old conclusion as current fact.
++
++## 1. Evidence labels
++
++Use these labels in issues, PRs, release notes, and application materials:
++
++- `STATIC_REVIEW` — conclusion from source/config inspection only.
++- `OFFLINE_TEST` — reproduced without live Codex model/account access.
++- `LIVE_ISOLATED_TEST` — reproduced against a controlled live runtime/thread that does not take over the user's active Desktop task.
++- `PRODUCTION_OBSERVATION` — observed in a real user workflow with consent and documented scope.
++- `OFFICIAL_DOCUMENTATION` — documented by the platform/provider, but not necessarily observed on the user's runtime.
++- `DESIGN_PROPOSAL` — planned behavior, not implemented evidence.
++- `UNKNOWN` — insufficient evidence.
++
++Never rewrite `STATIC_REVIEW` as “tested” or `OFFICIAL_DOCUMENTATION` as “verified on this machine.”
++
++## 2. Repository findings that drive the roadmap
++
++### A. Strong safety foundation
++
++Relevant files:
++
++- `crg/coordinator.py`
++- `crg/recovery.py`
++- `crg/owned_recovery.py`
++- `crg/archive.py`
++- `crg/state_store.py`
++
++Observed design properties (`STATIC_REVIEW`):
++
++- Mutation intent is persisted before dangerous operations.
++- Ambiguous acceptance enters recovery instead of blind retry.
++- Positive read-back is used to reconcile forwarding/archive state.
++- Prompt and answer archives include integrity checks.
++- State is protected by checksums, locking, backups, and fail-closed schema handling.
++
++Implementation instruction: preserve these properties when adding account actions, reset redemption, or model switching.
++
++### B. Active-context and cumulative usage are already separated
++
++Relevant files:
++
++- `crg/telemetry.py`
++- `crg/repo_hook.py`
++- `crg/predictor.py`
++
++Observed design property (`STATIC_REVIEW`): `tokenUsage.last.totalTokens` is treated as active context while cumulative totals are stored separately. Missing active telemetry is not replaced by cumulative totals.
++
++Implementation instruction: keep this distinction in the new ledger. Weekly consumption must not sum active-context samples.
++
++### C. Current predictor is heuristic, not calibrated probability
++
++Relevant file: `crg/predictor.py`.
++
++Observed design (`STATIC_REVIEW`): prediction uses recent positive deltas, P75/latest/median scaling, and a safety buffer. `risk_score` is a ratio-like heuristic and `calibrated_probability` is false.
++
++Implementation instruction: keep the user-visible label as heuristic until empirical calibration is implemented and measured.
++
++### D. Repository configuration is not a safe public default
++
++Relevant files:
++
++- `crg.toml`
++- `crg/config.py`
++
++Observed (`STATIC_REVIEW`): repository config enables MODE_B, contains a machine-specific Codex binary path, and enables blocking behavior.
++
++Implementation instruction: fix this before promoting the repository as easy to clone and try.
++
++### E. Offline tests reference machine-specific evidence paths
++
++Relevant tests include schema/evidence paths under `docs/context-rollover/evidence` while that tree is intentionally ignored from version control.
++
++Evidence level: `STATIC_REVIEW`; this audit did not execute the clean-checkout suite.
++
++Implementation instruction: add committed sanitized fixtures and make live evidence optional.
++
++### F. Build flow can drift
++
++Relevant files:
++
++- `scripts/build_zipapp.py`
++- `dist/MANIFEST.json`
++- `dist/context-rollover-guard.manifest.json`
++- `dist/crg.pyz`
++- `dist/context-rollover-guard/scripts/crg.pyz`
++
++Observed (`STATIC_REVIEW`): the build script copies top-level package files and updates one primary artifact path; the process does not provide one explicit atomic release build that regenerates every distribution artifact and manifest.
++
++Do NOT claim the currently committed pyz files are different unless a byte/hash comparison proves it. The finding is about reproducibility risk.
++
++## 3. Files covered by the audit
++
++The review covered the tracked human-readable source/config/test files visible in the baseline tree, including:
++
++- root manifests, README, CONTRIBUTING, SECURITY, config and packaging files;
++- all `crg/*.py` runtime modules;
++- skill Markdown/YAML/reference files under `dist/context-rollover-guard`;
++- unit, integration, live-test, and support Python files under `tests/`;
++- release manifest text files.
++
++Binary `.pyz` and `.zip` artifacts were identified through repository metadata but were not independently unpacked/executed in the original review. Treat any behavior claim about their internal bytes as `UNKNOWN` until verified.
++
++## 4. Validation that was NOT completed in the original review
++
++Do not claim these were completed unless a later PR adds evidence:
++
++- Full unit suite on a clean clone.
++- Live Codex runtime validation for the maintainer account.
++- Real account usage/rate-limit reads.
++- Real reset redemption.
++- Production Desktop UI switching.
++- Independent execution of committed `.pyz`/`.zip` artifacts.
++- Cross-platform Windows behavior.
++- Any official `GPT-6 Sol` production ID or capability set not exposed by the runtime.
++
++## 5. External source policy
++
++The roadmap was informed by these source categories. Re-check dynamic documentation before implementation that depends on current protocol/model behavior.
++
++### Codex for OSS
++
++- Application form: `https://openai.com/zh-Hans-CN/form/codex-for-oss/`
++- Terms: `https://learn.chatgpt.com/docs/codex-for-oss-terms`
++
++Use for application fields, eligibility framing, and support terms. Do not infer guaranteed credits or approval probability.
++
++### Codex App Server / runtime protocol
++
++- `https://learn.chatgpt.com/docs/app-server`
++
++Use as supplemental documentation. The installed generated schema and runtime responses remain the compatibility authority for CRG adapters.
++
++### Hooks
++
++- `https://learn.chatgpt.com/docs/hooks`
++
++Use for hook concepts and supported surfaces. Do not treat `systemMessage` as an API for rewriting an already produced answer.
++
++### Model documentation
++
++- GPT-5.6: `https://openai.com/index/gpt-5-6/`
++- GPT-6 Astra: `https://openai.com/index/gpt-6-astra/`
++- Latest-model/developer guidance: `https://developers.openai.com/api/docs/guides/latest-model`
++
++Use runtime discovery for actual production IDs and effort support. Do not create future IDs from naming patterns.
++
++### Codex plan usage/reset behavior
++
++- `https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan`
++
++Use to understand that rate limits and resets may represent shared agentic usage and may change over time. Always prefer actual account snapshots for current user state.
++
++### Statistical reference
++
++Adaptive Conformal Inference under distribution shift:
++
++- `https://arxiv.org/abs/2106.00170`
++
++Use only as research input for later calibration experiments. Do not claim formal coverage guarantees for CRG without validating assumptions and empirical coverage.
++
++## 6. Claim checklist for future PRs
++
++Before writing “supports,” “verified,” “accurate,” “exact,” or “zero-cost,” answer all of these:
++
++1. What is the evidence label?
++2. Which runtime/model/version was used?
++3. What account/workspace/surface scope applies?
++4. Was the result measured on a clean checkout?
++5. Is the behavior implemented in source only, or also in release artifacts?
++6. Can an external maintainer reproduce it?
++7. Are missing values shown as unknown?
++8. Are raw prompts/answers excluded from published evidence?
++9. If a percentage is shown, is the denominator authoritative?
++10. If a recommendation is shown, is the user still in control?
++
++If any answer is unclear, downgrade the claim and document the missing evidence.
++
++## 7. Update procedure
++
++Whenever `main` changes a file involved in this roadmap:
++
++1. Record the new commit SHA.
++2. Compare the old and new commit for affected files.
++3. Mark invalidated audit conclusions as stale.
++4. Re-run clean-checkout tests.
++5. Re-run only the live tests needed for changed runtime contracts.
++6. Update compatibility matrix and release notes.
++7. Keep old evidence immutable and timestamped; do not overwrite history to make a new version look consistent.

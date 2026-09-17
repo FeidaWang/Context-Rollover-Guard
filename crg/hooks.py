@@ -85,6 +85,8 @@ class HookDispatcher:
             limit=resolve_limit(window,self.configured_limit,scope=self.scope,config=self.config.predictor)
             decision=predict(active,window,deltas,limit,self.config.predictor)
             guard['stop_prediction']=decision
+            from .continuity import decide
+            guard['continuity_policy']=decide(high_pressure=decision['decision']=='ARM').value
             can_warn=self.allow_warning and state.mode==Mode.B.value
             changed=replace(state,pending_answer_path=str(path),last_turn_id=turn,telemetry=telemetry)
             if can_warn and decision['decision']=='ARM':
@@ -128,6 +130,7 @@ class HookDispatcher:
         current=self.store.read()
         if current is None:raise HookError('Session state unavailable')
         if current.mode!=Mode.B.value or current.state==State.NORMAL.value:return {}
+        if current.state in {State.ARMED.value, State.EMERGENCY.value} and not self.config.emergency.force_rollover_on_next_prompt:return {}
         if current.state==State.EMERGENCY.value and not self.config.emergency.force_rollover_on_next_prompt:return {}
         if current.state==State.RECOVERY.value:
             validate_event(event,current)
@@ -187,6 +190,9 @@ class HookDispatcher:
             t=dict(state.telemetry);guard=dict(t.get('guard',{}));t['guard']=guard
             guard['emergency_snapshot']=str(snapshot);guard['force_rollover_on_next_prompt']=self.config.emergency.force_rollover_on_next_prompt
             guard['prediction_miss']=saved['state']['state']==State.NORMAL.value
+            if not block and not self.config.emergency.force_rollover_on_next_prompt:
+                guard['continuity_policy']='OBSERVE'
+                return replace(state,telemetry=t)
             target=State.EMERGENCY if state.state in {State.NORMAL.value,State.ARMED.value,State.EMERGENCY.value} else State.RECOVERY
             changed=replace(state,telemetry=t).transition(target)
             if block:output.update({'continue':False,'stopReason':'CRG 已保存紧急状态；需要在同 workspace 的 fresh task 恢复。'})

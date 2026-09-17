@@ -1,0 +1,13 @@
+{
+  "definitions": {
+    "HookEventName": {
+      "enum": [
+        "stop",
+        "userPromptSubmit",
+        "preCompact",
+        "postCompact",
+        "sessionStart"
+      ]
+    }
+  }
+}

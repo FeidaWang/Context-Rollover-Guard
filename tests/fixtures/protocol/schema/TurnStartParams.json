@@ -1,0 +1,70 @@
+{
+  "type": "object",
+  "properties": {
+    "cwd": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "modelProvider": {
+      "type": "string"
+    },
+    "approvalsReviewer": {
+      "type": "string"
+    },
+    "permissions": {
+      "type": "string"
+    },
+    "approvalPolicy": {
+      "type": [
+        "string",
+        "object"
+      ]
+    },
+    "serviceTier": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "threadId": {
+      "type": "string"
+    },
+    "clientUserMessageId": {
+      "type": "string"
+    },
+    "effort": {
+      "type": "string"
+    },
+    "sandboxPolicy": {
+      "type": "object"
+    },
+    "input": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "text"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "threadId",
+    "input"
+  ],
+  "additionalProperties": false
+}

@@ -7,8 +7,9 @@ Please keep changes conservative and explicit about their runtime assumptions. I
 Before opening a pull request, run:
 
 ```sh
-python3 -m unittest discover -s tests/unit -v
-python3 dist/context-rollover-guard/scripts/self_test.py
+python3 scripts/verify_offline.py --clean
 ```
 
 Keep generated local state, archives, credentials, and machine-specific evidence out of commits. Add or update tests for behavioral changes, and describe any Codex-version dependency in the pull request.
+
+Start with the [contributor quickstart](docs/CONTRIBUTOR-QUICKSTART.md) and [compatibility matrix](docs/COMPATIBILITY.md).

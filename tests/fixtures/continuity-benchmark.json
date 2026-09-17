@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "scope": "synthetic offline protocol behavior, not task-quality or live-cost evidence",
+  "cases": [
+    {"id": "native-continuation-v1", "path": "native"},
+    {"id": "observe-only-v1", "path": "observe"},
+    {"id": "explicit-handoff-v1", "path": "handoff"},
+    {"id": "ambiguous-receipt-recovery-v1", "path": "recovery"}
+  ]
+}

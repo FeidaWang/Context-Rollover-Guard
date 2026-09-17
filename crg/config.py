@@ -17,6 +17,10 @@ class General:
     codex_binary: str = ""  # explicitly selected runtime; empty uses PATH
     archive_root: str = ".codex/context-archive"
     state_root: str = ""  # resolved from CODEX_HOME, not created while loading
+    schema_cache: str = ""
+    capability_receipt: str = ""
+    hook_receipts: str = ""
+    evidence_exports: str = ""
 
 
 @dataclass(frozen=True)
@@ -54,10 +58,10 @@ class Config:
     emergency: Emergency = field(default_factory=Emergency)
 
     def paths(self, workspace: Path) -> tuple[Path, Path]:
-        workspace = workspace.resolve()
-        archive = Path(self.context_rollover.archive_root).expanduser()
-        state = Path(self.context_rollover.state_root).expanduser()
-        return ((workspace / archive).resolve(), (workspace / state).resolve())
+        from .runtime_paths import RuntimePaths
+        paths = RuntimePaths.resolve(workspace, self)
+        return paths.archive_root, paths.state_root
+
 
 
 SECTIONS = {"context_rollover": General, "predictor": Predictor,
@@ -66,26 +70,35 @@ SECTIONS = {"context_rollover": General, "predictor": Predictor,
 
 def load_config(workspace: Path, user_file: Path | None = None,
                 repo_file: Path | None = None, overrides: dict | None = None) -> Config:
+    return resolve_config(workspace, user_file, repo_file, overrides)[0]
+
+
+def resolve_config(workspace: Path, user_file: Path | None = None,
+                   repo_file: Path | None = None, overrides: dict | None = None):
+    """Return validated config and per-field provenance without writes or runtime calls."""
+    provenance = {name: {f.name: "default" for f in fields(cls)}
+                  for name, cls in SECTIONS.items()}
     home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
     merged = {name: {} for name in SECTIONS}
     merged["context_rollover"]["state_root"] = str(home / "context-rollover")
     sources = []
-    for path in (user_file if user_file is not None else home / "context-rollover.toml",
-                 repo_file if repo_file is not None else workspace / "crg.toml"):
+    for label, path in zip(("user", "repo"), (user_file if user_file is not None else home / "context-rollover.toml",
+                 repo_file if repo_file is not None else workspace / "crg.toml")):
         if path.exists():
             try:
                 with path.open("rb") as f:
-                    sources.append(tomllib.load(f))
+                    sources.append((label, tomllib.load(f)))
             except (OSError, tomllib.TOMLDecodeError) as exc:
                 raise ConfigurationError(f"Invalid CRG configuration: {path}") from exc
-    sources.append(overrides or {})
-    for source in sources:
+    sources.append(("cli", overrides or {}))
+    for label, source in sources:
         if not isinstance(source, dict) or set(source) - set(SECTIONS):
             raise ConfigurationError("Unknown CRG configuration section")
         for name, values in source.items():
             if not isinstance(values, dict) or set(values) - {f.name for f in fields(SECTIONS[name])}:
                 raise ConfigurationError(f"Unknown field or invalid section: {name}")
             merged[name].update(values)
+            provenance[name].update({key: label for key in values})
     objects = {}
     for name, cls in SECTIONS.items():
         defaults = cls()
@@ -115,4 +128,4 @@ def load_config(workspace: Path, user_file: Path | None = None,
     if not all((c.rollover.preserve_cwd, c.rollover.preserve_permissions,
                 c.rollover.forward_original_prompt)):
         raise ConfigurationError("CRG invariants cannot be disabled")
-    return c
+    return c, provenance

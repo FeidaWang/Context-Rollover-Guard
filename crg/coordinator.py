@@ -18,10 +18,11 @@ class TransactionError(RuntimeError):pass
 
 
 class Coordinator:
-    def __init__(self,root,archives,client,*,owned_surface=False,fault=None):
+    def __init__(self,root,archives,client,*,owned_surface=False,fault=None,archive_source=True):
         if not owned_surface:raise TransactionError('An explicitly owned client surface is required')
         self.root=private_directory(Path(root));self.archives=ArchiveManager(Path(archives))
         self.client=client;self.fault=fault or (lambda step:None)
+        self.archive_source=archive_source is True
 
     def _write(self,directory,name,payload):
         data=canonical(payload)
@@ -108,7 +109,8 @@ class Coordinator:
             started=self._read(directory,'started')
             if started is None:
                 if self._read(directory,'start-intent'):return self._blocked(directory,'start')
-                params=settings.thread_params(read_private(Path(prepared['archive'])/'handoff.md').decode())
+                params=settings.thread_params('',recovery_pointer=str(Path(prepared['archive'])/'handoff.json'))
+                # Only an escaped data pointer, never archived instruction text.
                 params['ephemeral']=False
                 self.client.schema.validate('thread/start',params)
                 self._write(directory,'start-intent',{'params_sha256':sha(canonical(params))})
@@ -146,6 +148,14 @@ class Coordinator:
             archived=self._read(directory,'archived')
             if archived is None:
                 if self._read(directory,'archive-intent'):return self._blocked(directory,'archive')
+                from .continuity import quiet_point
+                if not self.archive_source or not quiet_point(self.client, source.thread_id):
+                    result={'state':State.NORMAL.value,'rollover_id':rid,'old_thread_id':source.thread_id,
+                            'new_thread_id':new,'accepted_turn_id':accepted['turn_id'],
+                            'old_thread_archived':False,'source_retention_reason':'QUIET_POINT_UNVERIFIED' if self.archive_source else 'ARCHIVAL_DISABLED',
+                            'surface':'owned-app-server','desktop_switched':False}
+                    self._write(directory,'committed',result)
+                    return result
                 self._write(directory,'archive-intent',{'old_thread_id':source.thread_id,'accepted_turn_id':accepted['turn_id']})
                 try:
                     self.client.request('thread/archive',{'threadId':source.thread_id})

@@ -3,7 +3,7 @@
 Run the bundled runtime with existing, explicit paths:
 
 ```sh
-python3.13 <skill>/scripts/crg.pyz recover --workspace <absolute-workspace> --transaction-root <transactions> --archive-root <archives> --rollover-id crg_<digest>
+python3 <skill>/scripts/crg.pyz recover --workspace <absolute-workspace> --transaction-root <transactions> --archive-root <archives> --rollover-id crg_<digest>
 ```
 
 Without --reconcile this inspects the journal without contacting Codex. Missing transactions are not permission to recreate them. A MODE_B handoff need not have an owned-client transaction; do not fabricate one.

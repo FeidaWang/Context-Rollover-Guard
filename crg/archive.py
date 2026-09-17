@@ -46,7 +46,7 @@ class ArchiveManager:
             if meta_path.exists():metadata=json.loads(read_private(meta_path))
             else:
                 workspace=workspace_snapshot(Path(state.cwd))
-                metadata={'schema_version':1,'rollover_id':rid,'old_thread_id':state.thread_id,
+                metadata={'schema_version':2,'rollover_id':rid,'old_thread_id':state.thread_id,
                     'old_turn_id':state.last_turn_id,'session_id':state.session_id,'cwd':state.cwd,
                     'repo_root':workspace['repo_root'],'git_branch':workspace['git_branch'],
                     'git_head':workspace['git_head'],'model':state.model,'workspace':workspace,
@@ -57,7 +57,8 @@ class ArchiveManager:
             if metadata.get('rollover_id')!=rid or metadata.get('cwd')!=state.cwd:
                 raise ValueError('Archive metadata identity conflict')
             source={k:metadata[k] for k in ('rollover_id','old_thread_id','old_turn_id')}
-            handoff,data=build_handoff(source,metadata['workspace'],directory)
+            handoff,data=build_handoff(source,metadata['workspace'],directory,
+                prompt_hash=sha(read_private(prompt_path)), answer_hash=sha(answer), version=metadata['schema_version'])
             immutable_write(directory/'handoff.md',handoff.encode('utf-8'))
             immutable_write(directory/'handoff.json',canonical(data));self.fault('handoff_written')
             checks={name:sha(read_private(directory/name)) for name in sorted(FILES)}
@@ -88,4 +89,12 @@ class ArchiveManager:
             if sha(read_private(directory/name))!=digest:raise ValueError('Archive integrity failure')
         prompt=json.loads(read_private(directory/'prompt.json'))
         if sha(prompt['text'].encode())!=prompt['sha256']:raise ValueError('Prompt checksum mismatch')
+        handoff=json.loads(read_private(directory/'handoff.json'))
+        if handoff.get('schema_version') not in {1,2}:raise ValueError('Unsupported handoff version')
+        if handoff['schema_version']==2:
+            for key,name in [('user_prompt','prompt.json'),('previous_answer','answer.md')]:
+                if handoff.get(key)!={'path':name,'sha256':entries[name]}:raise ValueError('Handoff data pointer mismatch')
+            for instruction in handoff.get('instruction_sources',[]):
+                if instruction.get('kind')!='user' and instruction.get('replayable') is not False:
+                    raise ValueError('Non-user instruction replay forbidden')
         return {'rollover_id':directory.name,'verified':True,'files':sorted(FILES)}

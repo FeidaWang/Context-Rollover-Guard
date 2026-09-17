@@ -1,5 +1,6 @@
 from pathlib import Path
 import tempfile,json,unittest
+from unittest.mock import patch
 from crg.repo_hook import dispatch_repo,transcript_events
 from crg.state_store import StateStore
 
@@ -15,6 +16,24 @@ class RepoHookTests(unittest.TestCase):
                    {'type':'turn_context','payload':{'turn_id':'turn','cwd':str(self.root)}},
                    {'type':'token_usage_record','payload':{'thread_id':'session','turn_id':'turn','usage':usage,'thread_token_usage':usage|{'total_tokens':999999}}}]
         self.log.write_text(''.join(json.dumps(r)+'\n' for r in self.rows))
+        # Supply only the metadata this adapter reads; never depend on private evidence.
+        receipt=self.root/'.state/runtime/capabilities.json'
+        (self.root/'.state').mkdir(mode=0o700)
+        receipt.parent.mkdir(mode=0o700)
+        receipt.write_text((Path(__file__).resolve().parents[2]/'tests/fixtures/native-capabilities.json').read_text())
+    def test_missing_runtime_evidence_stays_unverified(self):
+        read = Path.read_text
+        def missing(path, *args, **kwargs):
+            if path.name == 'capabilities.json':
+                raise FileNotFoundError('No live evidence')
+            return read(path, *args, **kwargs)
+        with patch.object(Path, 'read_text', missing):
+            dispatch_repo(self.base|{'hook_event_name':'Stop','last_assistant_message':'synthetic answer',
+                                    'transcript_path':str(self.log)},self.root,native_home=self.home)
+        state=StateStore(self.root/'.state',self.root,'session').read()
+        self.assertEqual(state.telemetry['repo_adapter']['telemetry_status'],'UNAVAILABLE_OR_UNVERIFIED')
+        self.assertEqual(state.telemetry['guard']['stop_prediction']['decision'],'UNKNOWN')
+
     def test_native_active_never_cumulative(self):
         result=transcript_events(self.log,session='session',cwd=self.root,version='0.153.4',allowed_root=self.sessions)
         self.assertEqual(result[0]['params']['tokenUsage']['last']['totalTokens'],100)

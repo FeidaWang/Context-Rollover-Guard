@@ -217,8 +217,8 @@ class Foundation(unittest.TestCase):
         self.assertEqual(result['selected_mode'],'MODE_A')
         self.assertTrue(result['errors'])
 
-    def test_installed_schema_contract(self):
-        path=Path(__file__).resolve().parents[2]/'docs/context-rollover/evidence/schema'
+    def test_public_schema_contract(self):
+        path=Path(__file__).resolve().parents[2]/'tests/fixtures/protocol/schema'
         result=inspect_schema(path)
         self.assertTrue(all(result['methods'].values()))
         self.assertTrue(all(result['hooks_supported'].values()))

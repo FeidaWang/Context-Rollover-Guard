@@ -6,7 +6,7 @@ from crg.owned_recovery import reconcile_run
 class RecoveryTests(unittest.TestCase):
     setUp=test_owned_client.OwnedTests.setUp
     def prepare_lost_completion(self):
-        output=self.session.submit(' exact\r\n🙂 ')
+        output=self.session.submit(' exact\r\n🙂 ', fresh=True)
         (self.session.root/'input-000001-completed.json').unlink()
         intent=json.loads((self.session.root/'input-000001-intent.json').read_text())
         self.native={'thread':{'id':self.session.thread,'cwd':str(self.root),'turns':[{

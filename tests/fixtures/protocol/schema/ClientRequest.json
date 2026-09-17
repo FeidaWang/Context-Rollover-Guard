@@ -1,0 +1,272 @@
+{
+  "description": "Synthetic minimal offline contract; not a generated runtime schema.",
+  "oneOf": [
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "initialize"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "clientInfo": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "version"
+              ],
+              "additionalProperties": false
+            },
+            "capabilities": {
+              "type": "object",
+              "properties": {
+                "experimentalApi": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "clientInfo"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "thread/start"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "cwd": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "modelProvider": {
+              "type": "string"
+            },
+            "approvalsReviewer": {
+              "type": "string"
+            },
+            "permissions": {
+              "type": "string"
+            },
+            "approvalPolicy": {
+              "type": [
+                "string",
+                "object"
+              ]
+            },
+            "serviceTier": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sandbox": {
+              "type": "string"
+            },
+            "developerInstructions": {
+              "type": "string"
+            },
+            "runtimeWorkspaceRoots": {
+              "type": "array"
+            },
+            "ephemeral": {
+              "type": "boolean"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "turn/start"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "cwd": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "modelProvider": {
+              "type": "string"
+            },
+            "approvalsReviewer": {
+              "type": "string"
+            },
+            "permissions": {
+              "type": "string"
+            },
+            "approvalPolicy": {
+              "type": [
+                "string",
+                "object"
+              ]
+            },
+            "serviceTier": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "threadId": {
+              "type": "string"
+            },
+            "clientUserMessageId": {
+              "type": "string"
+            },
+            "effort": {
+              "type": "string"
+            },
+            "sandboxPolicy": {
+              "type": "object"
+            },
+            "input": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "enum": [
+                      "text"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "threadId",
+            "input"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "thread/archive"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "threadId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "threadId"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "thread/read"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "threadId": {
+              "type": "string"
+            },
+            "includeTurns": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "threadId"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "config/read"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "cwd": {
+              "type": "string"
+            },
+            "includeLayers": {
+              "type": "boolean"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "method": {
+          "enum": [
+            "hooks/list"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "cwds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

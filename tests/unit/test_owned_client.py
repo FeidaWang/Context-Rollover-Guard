@@ -38,7 +38,7 @@ class OwnedTests(unittest.TestCase):
         first=self.session.submit('first');old=self.session.thread
         store=StateStore(self.config.paths(self.root)[1],self.root,old)
         store.update(lambda s:replace(s,state=State.ARMED.value))
-        second=self.session.submit(' exact\r\n🙂 ');new=self.session.thread
+        second=self.session.submit(' exact\r\n🙂 ', fresh=True);new=self.session.thread
         third=self.session.submit('third')
         self.assertNotEqual(old,new);self.assertEqual(third['thread_id'],new)
         calls=[p for m,p in self.client.calls if m=='turn/start']
@@ -61,7 +61,7 @@ class OwnedTests(unittest.TestCase):
         self.session.submit('first')
         store=StateStore(self.config.paths(self.root)[1],self.root,self.session.thread)
         store.update(lambda s:replace(s,state=State.ARMED.value))
-        self.session.submit('second');new=self.session.thread
+        self.session.submit('second', fresh=True);new=self.session.thread
         resumed=OwnedSession(self.client,self.config,timeout=.02)
         resumed.resume(self.session.root)
         self.assertEqual(resumed.thread,new)
@@ -73,3 +73,22 @@ class OwnedTests(unittest.TestCase):
         resumed=OwnedSession(self.client,self.config,timeout=.02)
         with self.assertRaises(ValueError):resumed.resume(self.session.root)
         self.assertEqual(len(self.client.calls),before)
+
+    def test_pressure_does_not_request_fresh_thread(self):
+        self.session.submit('first')
+        old = self.session.thread
+        store = StateStore(self.config.paths(self.root)[1],self.root,old)
+        store.update(lambda s:replace(s,state=State.ARMED.value))
+        self.session.submit('native continuation')
+        self.assertEqual(self.session.thread, old)
+        self.assertFalse(any(m=='thread/archive' for m,p in self.client.calls))
+
+    def test_advice_is_separate_and_failure_never_changes_answer(self):
+        events=[];self.session.emit=events.append
+        self.session.advice={'advice':{},'estimate':{}}
+        answer=self.session.submit('keep original')
+        self.assertEqual(events[-1]['type'],'advice_status')
+        self.assertEqual(events[-2]['text'],answer['text'])
+        self.assertNotIn('CRG next-task estimate',answer['text'])
+        self.session.advice=object()
+        self.assertEqual(self.session.submit('still works')['type'],'answer')

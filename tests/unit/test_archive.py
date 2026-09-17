@@ -73,7 +73,8 @@ class Archives(unittest.TestCase):
         h=json.loads((folder/'handoff.json').read_text())
         self.assertEqual(h['workspace']['cwd'],str(self.cwd))
         self.assertIsNone(h['workspace']['git_head'])
-        self.assertEqual(h['previous_answer'],str(folder/'answer.md'))
+        self.assertEqual(h['previous_answer']['path'],'answer.md')
+        self.assertEqual(h['schema_version'],2)
 
     def test_concurrent_archive_same_request(self):
         ctx=mp.get_context('spawn');processes=[ctx.Process(target=concurrent_archive,args=(str(self.archive.root),str(self.cwd))) for _ in range(3)]

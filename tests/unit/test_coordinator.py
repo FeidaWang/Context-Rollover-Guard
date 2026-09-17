@@ -12,8 +12,11 @@ from crg.durable import immutable_write,private_directory
 ROOT=Path(__file__).resolve().parents[2]
 class Crash(BaseException):pass
 class FakeClient:
+    def read_activity(self, thread_id):
+        return {'thread_id':thread_id,'complete':True,'turn_state':'completed','tools':[],'children':[]}
+
     def __init__(self,cwd):
-        self.workspace=cwd;self.schema=ProtocolSchema(ROOT/'docs/context-rollover/evidence/schema');self.calls=[]
+        self.workspace=cwd;self.schema=ProtocolSchema(ROOT/'tests/fixtures/protocol/schema');self.calls=[]
         self.response={'cwd':str(cwd),'model':'m','modelProvider':'openai','approvalPolicy':'never','approvalsReviewer':'user',
                        'sandbox':{'type':'readOnly','networkAccess':False},'reasoningEffort':'low',
                        'thread':{'id':'new','cwd':str(cwd),'turns':[]}}
@@ -38,6 +41,24 @@ class CoordinatorTests(unittest.TestCase):
         self.c=Coordinator(self.root/'transactions',self.root/'archives',self.client,owned_surface=True)
         self.settings=ExecutionSettings.from_start(self.client.response);self.prompt=' 原文\r\n🙂  '
         self.rid=self.c.prepare(self.state,self.prompt,self.settings)
+    def test_unknown_activity_retains_source_without_replay(self):
+        self.client.read_activity = lambda thread: {'thread_id':thread,'complete':False}
+        result = self.c.run(self.rid)
+        self.assertFalse(result['old_thread_archived'])
+        self.assertEqual(self.c.run(self.rid), result)
+        self.assertEqual([m for m,p in self.client.calls], ['thread/start','turn/start'])
+
+    def test_archival_disabled_retains_source_even_at_quiet_point(self):
+        self.c.archive_source=False
+        result=self.c.run(self.rid)
+        self.assertFalse(result['old_thread_archived'])
+        self.assertEqual(result['source_retention_reason'],'ARCHIVAL_DISABLED')
+
+    def test_active_child_retains_source(self):
+        self.client.read_activity = lambda thread: {'thread_id':thread,'complete':True,
+            'turn_state':'completed','tools':[],'children':[{'state':'running'}]}
+        self.assertFalse(self.c.run(self.rid)['old_thread_archived'])
+
     def test_complete_exact_once_and_idempotent_repeat(self):
         result=self.c.run(self.rid);self.assertTrue(result['old_thread_archived']);self.assertFalse(result['desktop_switched'])
         self.assertEqual(self.c.run(self.rid),result)

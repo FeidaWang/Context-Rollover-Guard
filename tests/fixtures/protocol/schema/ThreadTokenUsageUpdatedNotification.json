@@ -1,0 +1,18 @@
+{
+  "definitions": {
+    "ThreadTokenUsage": {
+      "properties": {
+        "last": {},
+        "total": {},
+        "modelContextWindow": {}
+      }
+    },
+    "TokenUsageBreakdown": {
+      "properties": {
+        "totalTokens": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

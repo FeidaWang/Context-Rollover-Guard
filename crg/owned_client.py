@@ -17,17 +17,18 @@ from .hooks import pending_answer
 
 
 class OwnedSession:
-    def __init__(self, client, config, *, timeout=300, emit=None, approve=None):
+    def __init__(self, client, config, *, timeout=300, emit=None, approve=None, advice=None):
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError("Timeout must be finite and positive")
         self.client, self.config = client, config
         self.timeout, self.emit, self.approve = timeout, emit or (lambda event: None), approve
         archives, self.states = config.paths(client.workspace)
         self.root = private_directory(self.states / 'owned-runs' / uuid.uuid4().hex)
-        self.coordinator = Coordinator(self.states / 'transactions', archives, client, owned_surface=True)
+        self.coordinator = Coordinator(self.states / 'transactions', archives, client, owned_surface=True, archive_source=config.rollover.archive_old_thread)
         self.thread = self.settings = None
         self.blocked = False
         self.sequence = 0
+        self.advice = advice
 
     def record(self, name, value):
         immutable_write(self.root / (name + '.json'), canonical(value))
@@ -96,17 +97,25 @@ class OwnedSession:
         self.sequence = len(inputs)
         self.emit({'type': 'ready', 'thread_id': thread, 'journal': str(directory), 'resumed': True})
 
-    def submit(self, prompt):
+    def submit(self, prompt, *, fresh=False):
         if self.blocked or not self.thread:
             raise ValueError('Session requires recovery; no automatic resend')
         if not isinstance(prompt, str):
             raise ValueError('Only exact text prompts are supported')
         self.sequence += 1
         key = f'input-{self.sequence:06d}'
-        self.record(key, {'thread_id': self.thread, 'text': prompt})
+        self.record(key, {'thread_id': self.thread, 'text': prompt, 'explicit_fresh': fresh is True})
         try:
             state = StateStore(self.states, self.client.workspace, self.thread).read()
-            if state and state.state in (State.ARMED.value, State.EMERGENCY.value):
+            from .continuity import decide
+            policy = decide(explicit_fresh=fresh is True,
+                            ambiguous=state is not None and state.state not in {State.NORMAL.value, State.ARMED.value, State.EMERGENCY.value},
+                            high_pressure=state is not None and state.state in {State.ARMED.value, State.EMERGENCY.value})
+            self.emit({'type': 'continuity', 'policy': policy.value})
+            if fresh is True and state and state.state in (State.NORMAL.value, State.ARMED.value, State.EMERGENCY.value):
+                if state.state == State.NORMAL.value:
+                    from dataclasses import replace
+                    state = replace(state, state=State.ARMED.value)
                 rid = self.coordinator.prepare(state, prompt, self.settings)
                 self.record(key + '-transaction', {'rollover_id': rid})
                 result = self.coordinator.run(rid)
@@ -116,7 +125,7 @@ class OwnedSession:
                 self.thread = result['new_thread_id']
                 turn = result['accepted_turn_id']
                 self.emit({'type': 'rollover', **result})
-            elif state and state.state != State.NORMAL.value:
+            elif state and state.state not in {State.NORMAL.value, State.ARMED.value, State.EMERGENCY.value}:
                 raise RuntimeError('Source state requires recovery')
             else:
                 params = self.settings.turn_params(self.thread, prompt, self.root.name + '-' + key)
@@ -159,6 +168,12 @@ class OwnedSession:
                           'text': answer, 'state': state.state,
                           'prediction': state.telemetry.get('guard', {}).get('stop_prediction')}
                 self.emit(output)
+                if self.advice is not None:
+                    try:
+                        from .advice_render import render_status
+                        self.emit({'type':'advice_status','text':render_status(self.advice.get('advice',{}),self.advice.get('estimate'))})
+                    except Exception:
+                        pass  # Optional rendering must never invalidate a completed answer.
                 return output
         raise TimeoutError('Turn completion timed out; prompt retained, no automatic resend')
 
@@ -171,7 +186,10 @@ def run_chat(args):
     config = load_config(args.workspace)
     if not config.context_rollover.enabled or config.context_rollover.mode != 'MODE_B':
         raise ValueError('Owned chat requires installed MODE_B repo Hooks')
-    schema = ProtocolSchema(args.schema)
+    from .runtime_paths import RuntimePaths
+    paths = RuntimePaths.resolve(args.workspace, config)
+    schema = ProtocolSchema(args.schema or paths.schema_cache,
+                            manifest_path=None if args.schema else paths.capability_receipt)
     client = AppServerClient(schema.runtime_binary, schema, args.workspace,
                              expected_version=schema.runtime_version,
                              command=[schema.runtime_binary, '-c', 'features.hooks=true', 'app-server', '--stdio'])
@@ -194,14 +212,18 @@ def run_chat(args):
             return 0 if result["state"] == "READY_TO_RESUME" else 1
         listing = client.request('hooks/list', {'cwds': [str(args.workspace.resolve())]})['data'][0]
         # Bind to the installer-owned commands, not merely five arbitrary trusted events.
-        receipt_file = args.workspace / 'docs/context-rollover/evidence/mode-b-runtime-review.json'
+        receipt_file = paths.hook_review
         expected = json.loads(receipt_file.read_text())['hooks']
         actual = {h['key']: h for h in listing['hooks']}
         if listing.get('errors') or len(expected) != 5 or any(
             h['key'] not in actual or actual[h['key']]['currentHash'] != h['currentHash'] or
             actual[h['key']]['trustStatus'] != 'trusted' or not actual[h['key']]['enabled'] for h in expected):
             raise ValueError('Installed CRG Hook definitions must match reviewed, trusted definitions')
-        session = OwnedSession(client, config, timeout=args.timeout, emit=emit, approve=approve)
+        advice=None
+        if args.advice_file:
+            try:advice=json.loads(args.advice_file.read_text())
+            except (OSError,ValueError):advice={'advice':{},'estimate':{}}
+        session = OwnedSession(client, config, timeout=args.timeout, emit=emit, approve=approve, advice=advice)
         params = {'sandbox': 'read-only'}
         if args.permissions:
             params = {'permissions': args.permissions}
@@ -221,9 +243,9 @@ def run_chat(args):
                 request = json.loads(line)
                 if request == {'quit': True}:
                     break
-                if not isinstance(request, dict) or set(request) != {'text'}:
-                    raise ValueError('Expected a JSON object containing only text, or quit=true')
-                session.submit(request['text'])
+                if not isinstance(request, dict) or set(request) not in ({'text'}, {'text', 'fresh'}) or type(request.get('fresh', False)) is not bool:
+                    raise ValueError('Expected text with optional boolean fresh, or quit=true')
+                session.submit(request['text'], fresh=request.get('fresh', False))
         return 0
     finally:
         client.close()

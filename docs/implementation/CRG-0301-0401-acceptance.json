@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-17",
+  "evidence": "OFFLINE_TEST",
+  "offline_status": "PASS",
+  "release_status": "BLOCKED",
+  "python": "3.13.14",
+  "platform": "macOS",
+  "unit_tests": 236,
+  "integration_tests": 4,
+  "synthetic_benchmark_cases": 4,
+  "artifacts_verified": 10,
+  "source_sha256": "023edd4dfebb60c117e012a16f9f825c4ea69a8fb69a84a7b36eaf5571e3b65a",
+  "tickets": {
+    "CRG-0301": "OFFLINE_EXPERIMENT_ONLY",
+    "CRG-0302": "OFFLINE_EXPERIMENT_ONLY",
+    "CRG-0303": "SYNTHETIC_ADAPTER_ONLY",
+    "CRG-0304": "DEFERRED",
+    "CRG-0401": "SYNTHETIC_ADAPTER_ONLY"
+  },
+  "actual_redemption": false,
+  "production_policy_activated": false,
+  "published": false,
+  "details": "CRG-0301-0401-RESULTS.md"
+}
